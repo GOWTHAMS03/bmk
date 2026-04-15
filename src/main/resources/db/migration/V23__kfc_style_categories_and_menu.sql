@@ -7,6 +7,9 @@ DELETE FROM order_items;
 DELETE FROM menu_items;
 DELETE FROM categories;
 
+ALTER TABLE coupons
+    ADD COLUMN IF NOT EXISTS max_discount_amount NUMERIC;
+
 -- ── Categories ──────────────────────────────────────────────
 INSERT INTO categories (id, name, description, sort_order, is_active) VALUES
     (uuid_generate_v4(), 'Chicken',  'Crispy, grilled and saucy chicken favourites',          1, true),
