@@ -1,0 +1,1263 @@
+{
+	"info": {
+		"_postman_id": "bmk-collection-v1",
+		"name": "BusyMumKitchen API",
+		"description": "Complete API collection for the BusyMumKitchen food ordering backend.\n\nBase path: `/api/v1`\n\n**Auth flow:** Send OTP → Verify OTP (tokens auto-saved) → Use authenticated endpoints.\n\nJWT Bearer token is automatically attached via the collection-level auth setting.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [],
+	"item": [
+		{
+			"name": "Auth",
+			"description": "Authentication endpoints – OTP-based login, registration, and token refresh.",
+			"item": [
+				{
+					"name": "Send OTP",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/send-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "send-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.accessToken) {",
+									"        pm.environment.set('accessToken', json.data.accessToken);",
+									"        pm.environment.set('refreshToken', json.data.refreshToken);",
+									"    }",
+									"    if (json.data && json.data.user) {",
+									"        pm.environment.set('userId', json.data.user.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"otp\": \"{{otp}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/verify-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "verify-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.accessToken) {",
+									"        pm.environment.set('accessToken', json.data.accessToken);",
+									"        pm.environment.set('refreshToken', json.data.refreshToken);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh-token",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "refresh-token"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.id) {",
+									"        pm.environment.set('userId', json.data.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"fullName\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"whatsappNumber\": \"{{phoneNumber}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "register"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "User",
+			"description": "User profile, addresses, and favorites.",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/users/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "profile"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Busy Mum\",\n  \"email\": \"busymum@example.com\",\n  \"whatsappNumber\": \"+919876543210\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "profile"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Addresses",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/users/addresses",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "addresses"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Address",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.id) {",
+									"        pm.environment.set('addressId', json.data.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"label\": \"Home\",\n  \"addressLine1\": \"123 Main Street\",\n  \"addressLine2\": \"Apt 4B\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"pincode\": \"400001\",\n  \"latitude\": 19.076,\n  \"longitude\": 72.8777,\n  \"isDefault\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/addresses",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "addresses"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Address",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{baseUrl}}/users/addresses/{{addressId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "addresses", "{{addressId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Favorites",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/users/favorites",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "favorites"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Favorite",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/users/favorites/{{menuItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "favorites", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Favorite",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{baseUrl}}/users/favorites/{{menuItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "favorites", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Menu",
+			"description": "Public menu browsing – categories and menu items.",
+			"item": [
+				{
+					"name": "Get Categories",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["restaurants", "{{restaurantId}}", "categories"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Menu Items (paginated)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.content && json.data.content.length > 0) {",
+									"        pm.environment.set('menuItemId', json.data.content[0].id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/menu?page=0&size=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["restaurants", "{{restaurantId}}", "menu"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" },
+								{ "key": "categoryId", "value": "{{categoryId}}", "disabled": true },
+								{ "key": "search", "value": "", "disabled": true }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Menu Items by Category",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/menu?categoryId={{categoryId}}&page=0&size=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["restaurants", "{{restaurantId}}", "menu"],
+							"query": [
+								{ "key": "categoryId", "value": "{{categoryId}}" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Menu Items",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/menu?search=chicken&page=0&size=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["restaurants", "{{restaurantId}}", "menu"],
+							"query": [
+								{ "key": "search", "value": "chicken" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Menu Item by ID",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/menu-items/{{menuItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu-items", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Cart",
+			"description": "Shopping cart operations – add, update, remove items, and coupons.",
+			"item": [
+				{
+					"name": "Get Cart",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Item to Cart",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"menuItemId\": \"{{menuItemId}}\",\n  \"quantity\": 2,\n  \"specialRequest\": \"Extra spicy\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/items",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "items"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Cart Item Quantity",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"quantity\": 3\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/items/{{menuItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "items", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Item from Cart",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{baseUrl}}/cart/items/{{menuItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "items", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Cart",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Coupon",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"couponCode\": \"{{couponCode}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/apply-coupon",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "apply-coupon"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Coupon",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{baseUrl}}/cart/coupon",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "coupon"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Orders",
+			"description": "Order creation, listing, details, and reorder.",
+			"item": [
+				{
+					"name": "Create Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.id) {",
+									"        pm.environment.set('orderId', json.data.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customerName\": \"Test User\",\n  \"customerPhone\": \"{{phoneNumber}}\",\n  \"deliveryAddress\": \"123 Main Street, Mumbai 400001\",\n  \"notes\": \"Ring the doorbell twice\",\n  \"paymentMethod\": \"COD\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Orders",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/orders?page=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "10" },
+								{ "key": "status", "value": "PLACED", "disabled": true }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Orders (filter by status)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/orders?status=PLACED&page=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"],
+							"query": [
+								{ "key": "status", "value": "PLACED" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "10" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order by ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "{{orderId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reorder",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.id) {",
+									"        pm.environment.set('orderId', json.data.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/reorder",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "{{orderId}}", "reorder"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Payments",
+			"description": "Payment retrieval and Stripe webhook.",
+			"item": [
+				{
+					"name": "Get Payment by Order ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{orderId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["payments", "{{orderId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Stripe Webhook (test)",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Stripe-Signature", "value": "t=1234567890,v1=test_signature" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": \"evt_test\",\n  \"type\": \"payment_intent.succeeded\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"pi_test_123\",\n      \"status\": \"succeeded\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/payments/webhook",
+							"host": ["{{baseUrl}}"],
+							"path": ["payments", "webhook"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"description": "Server-Sent Events for real-time order updates.",
+			"item": [
+				{
+					"name": "Subscribe to SSE Stream",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "text/event-stream" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/stream",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", "stream"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"description": "Admin-only endpoints. Requires ADMIN role JWT.",
+			"item": [
+				{
+					"name": "Categories",
+					"item": [
+						{
+							"name": "Create Category",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"if (pm.response.code === 201) {",
+											"    var json = pm.response.json();",
+											"    if (json.data && json.data.id) {",
+											"        pm.environment.set('categoryId', json.data.id);",
+											"    }",
+											"}"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Burgers\",\n  \"description\": \"Juicy handmade burgers\",\n  \"imageUrl\": \"https://example.com/burgers.jpg\",\n  \"sortOrder\": 1,\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/categories",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "categories"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Category",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Burgers & Wraps\",\n  \"description\": \"Burgers and wraps\",\n  \"imageUrl\": \"https://example.com/burgers-wraps.jpg\",\n  \"sortOrder\": 1,\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/categories/{{categoryId}}",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "categories", "{{categoryId}}"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Category",
+							"request": {
+								"method": "DELETE",
+								"url": {
+									"raw": "{{baseUrl}}/admin/categories/{{categoryId}}",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "categories", "{{categoryId}}"]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Menu Items",
+					"item": [
+						{
+							"name": "Create Menu Item",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"if (pm.response.code === 201) {",
+											"    var json = pm.response.json();",
+											"    if (json.data && json.data.id) {",
+											"        pm.environment.set('menuItemId', json.data.id);",
+											"    }",
+											"}"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"name\": \"Classic Chicken Burger\",\n  \"description\": \"Crispy chicken patty with lettuce, tomato, and mayo\",\n  \"price\": 249.00,\n  \"discountedPrice\": 199.00,\n  \"imageUrl\": \"https://example.com/chicken-burger.jpg\",\n  \"isVegetarian\": false,\n  \"isVegan\": false,\n  \"isGlutenFree\": false,\n  \"isAvailable\": true,\n  \"preparationTimeMins\": 15,\n  \"calories\": 550,\n  \"sortOrder\": 1,\n  \"stockQuantity\": -1\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/menu-items",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "menu-items"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Menu Item",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"name\": \"Classic Chicken Burger (Updated)\",\n  \"description\": \"Crispy chicken patty with lettuce, tomato, cheese, and mayo\",\n  \"price\": 279.00,\n  \"discountedPrice\": 229.00,\n  \"imageUrl\": \"https://example.com/chicken-burger-v2.jpg\",\n  \"isVegetarian\": false,\n  \"isVegan\": false,\n  \"isGlutenFree\": false,\n  \"isAvailable\": true,\n  \"preparationTimeMins\": 12,\n  \"calories\": 580,\n  \"sortOrder\": 1,\n  \"stockQuantity\": -1\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/menu-items/{{menuItemId}}",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "menu-items", "{{menuItemId}}"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Menu Item",
+							"request": {
+								"method": "DELETE",
+								"url": {
+									"raw": "{{baseUrl}}/admin/menu-items/{{menuItemId}}",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "menu-items", "{{menuItemId}}"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Toggle Menu Item Availability",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"available\": false\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/menu-items/{{menuItemId}}/availability",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "menu-items", "{{menuItemId}}", "availability"]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Orders",
+					"item": [
+						{
+							"name": "Get All Orders",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/admin/orders?page=0&size=20",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "orders"],
+									"query": [
+										{ "key": "page", "value": "0" },
+										{ "key": "size", "value": "20" },
+										{ "key": "status", "value": "PLACED", "disabled": true }
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get All Orders (filter by status)",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/admin/orders?status=CONFIRMED&page=0&size=20",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "orders"],
+									"query": [
+										{ "key": "status", "value": "CONFIRMED" },
+										{ "key": "page", "value": "0" },
+										{ "key": "size", "value": "20" }
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Order Status",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"status\": \"CONFIRMED\",\n  \"reason\": \"Order confirmed by kitchen\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/orders/{{orderId}}/status",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "orders", "{{orderId}}", "status"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Assign Delivery Partner",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"deliveryPartnerId\": \"{{deliveryPartnerId}}\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/orders/{{orderId}}/assign-delivery",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "orders", "{{orderId}}", "assign-delivery"]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Coupons",
+					"item": [
+						{
+							"name": "Get All Coupons",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/admin/coupons",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "coupons"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Coupon",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"if (pm.response.code === 201) {",
+											"    var json = pm.response.json();",
+											"    if (json.data && json.data.id) {",
+											"        pm.environment.set('couponId', json.data.id);",
+											"        pm.environment.set('couponCode', json.data.code);",
+											"    }",
+											"}"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"code\": \"WELCOME10\",\n  \"description\": \"10% off on your first order\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 10.00,\n  \"minOrderAmount\": 200.00,\n  \"maxDiscount\": 100.00,\n  \"usageLimit\": 1000,\n  \"validFrom\": \"2025-01-01T00:00:00\",\n  \"validUntil\": \"2026-12-31T23:59:59\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/coupons",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "coupons"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Coupon",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"code\": \"WELCOME15\",\n  \"description\": \"15% off on your first order\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 15.00,\n  \"minOrderAmount\": 300.00,\n  \"maxDiscount\": 150.00,\n  \"usageLimit\": 500,\n  \"validFrom\": \"2025-01-01T00:00:00\",\n  \"validUntil\": \"2026-12-31T23:59:59\",\n  \"isActive\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/coupons/{{couponId}}",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "coupons", "{{couponId}}"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Coupon",
+							"request": {
+								"method": "DELETE",
+								"url": {
+									"raw": "{{baseUrl}}/admin/coupons/{{couponId}}",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "coupons", "{{couponId}}"]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Analytics",
+					"item": [
+						{
+							"name": "Get Sales Analytics",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/admin/analytics/sales?from=2025-01-01&to=2026-12-31",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "analytics", "sales"],
+									"query": [
+										{ "key": "from", "value": "2025-01-01" },
+										{ "key": "to", "value": "2026-12-31" }
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Revenue Chart",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/admin/analytics/revenue?from=2025-01-01&to=2026-12-31",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "analytics", "revenue"],
+									"query": [
+										{ "key": "from", "value": "2025-01-01" },
+										{ "key": "to", "value": "2026-12-31" }
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Customers",
+					"item": [
+						{
+							"name": "Get Customers",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/admin/customers?page=0&size=20",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "customers"],
+									"query": [
+										{ "key": "page", "value": "0" },
+										{ "key": "size", "value": "20" },
+										{ "key": "search", "value": "", "disabled": true }
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Search Customers",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{baseUrl}}/admin/customers?search=test&page=0&size=20",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "customers"],
+									"query": [
+										{ "key": "search", "value": "test" },
+										{ "key": "page", "value": "0" },
+										{ "key": "size", "value": "20" }
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Customer Status",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"active\": false\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/customers/{{userId}}/status",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "customers", "{{userId}}", "status"]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Delivery Partner",
+			"description": "Delivery partner endpoints. Requires DELIVERY_PARTNER role JWT.",
+			"item": [
+				{
+					"name": "Get Delivery Profile",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/delivery/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "profile"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Assigned Orders",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/delivery/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "orders"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Accept Order",
+					"request": {
+						"method": "PUT",
+						"url": {
+							"raw": "{{baseUrl}}/delivery/orders/{{orderId}}/accept",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "orders", "{{orderId}}", "accept"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Order",
+					"request": {
+						"method": "PUT",
+						"url": {
+							"raw": "{{baseUrl}}/delivery/orders/{{orderId}}/reject",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "orders", "{{orderId}}", "reject"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Delivery Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"OUT_FOR_DELIVERY\",\n  \"latitude\": 19.076,\n  \"longitude\": 72.8777\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/delivery/orders/{{orderId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "orders", "{{orderId}}", "status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Location",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"latitude\": 19.076,\n  \"longitude\": 72.8777\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/delivery/location",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "location"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Availability",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"available\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/delivery/availability",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "availability"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Earnings",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/delivery/earnings?from=2025-01-01&to=2026-12-31",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "earnings"],
+							"query": [
+								{ "key": "from", "value": "2025-01-01" },
+								{ "key": "to", "value": "2026-12-31" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Earnings (default last 30 days)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/delivery/earnings",
+							"host": ["{{baseUrl}}"],
+							"path": ["delivery", "earnings"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Health Check",
+			"description": "Actuator health endpoint (public).",
+			"item": [
+				{
+					"name": "Health",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/actuator/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["actuator", "health"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
+

@@ -1,0 +1,183 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+spring:
+  application:
+    name: busymumkitchen
+
+  # PostgreSQL
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:busymumkitchen}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:admin1234}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+
+  # Flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  # MongoDB
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/busymumkitchen_logs}
+    # Redis Cache
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
+
+  # Redis Cache Type
+  cache:
+    type: ${CACHE_TYPE:simple}
+
+# Redis enabled flag (false = in-memory fallback for local dev)
+redis:
+  enabled: ${REDIS_ENABLED:false}
+
+# RabbitMQ – connection details only matter when rabbitmq.enabled=true
+spring.rabbitmq:
+  host: ${RABBITMQ_HOST:localhost}
+  port: ${RABBITMQ_PORT:5672}
+  username: ${RABBITMQ_USER:guest}
+  password: ${RABBITMQ_PASS:guest}
+  listener:
+    simple:
+      auto-startup: ${RABBITMQ_ENABLED:false}
+
+# Jackson
+spring.jackson:
+  serialization:
+    write-dates-as-timestamps: false
+  default-property-inclusion: non_null
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:bXVzdC1iZS1hdC1sZWFzdC01MTItYml0cy1sb25nLWZvci1IUzUxMi1hbGdvcml0aG0tc2VjdXJpdHktcmVxdWlyZW1lbnRz}
+  access-token-expiry: 86400000    # 24 hours
+  refresh-token-expiry: 604800000  # 7 days
+
+# OTP Configuration
+otp:
+  expiry-seconds: 300
+  length: 6
+  max-attempts: 5
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AWS SNS (SMS delivery)
+#
+# DEV MODE  (default):  aws.sns.enabled = false
+#   → No SnsClient bean is created (see AwsSnsConfig @ConditionalOnProperty).
+#   → SmsService falls back to console logging.
+#   → OTP is printed to STDOUT — look for "[DEV MODE] OTP CONSOLE DELIVERY".
+#
+# PRODUCTION / enable real SMS:
+#   Set the following environment variables (or override values below):
+#     AWS_SNS_ENABLED=true
+#     AWS_ACCESS_KEY=<your-access-key>
+#     AWS_SECRET_KEY=<your-secret-key>
+#     AWS_REGION=ap-south-1          (or your region)
+#     AWS_SNS_SENDER_ID=BMKITCHN     (optional)
+# ─────────────────────────────────────────────────────────────────────────────
+aws:
+  region: ${AWS_REGION:ap-south-1}
+  sns:
+    access-key: ${AWS_ACCESS_KEY:}
+    secret-key: ${AWS_SECRET_KEY:}
+    sender-id: ${AWS_SNS_SENDER_ID:BMKITCHN}
+    enabled: ${AWS_SNS_ENABLED:false}
+
+# WhatsApp Business API (Meta Graph API — template messages)
+whatsapp:
+  api-url: ${WHATSAPP_API_URL:https://graph.facebook.com/v18.0}
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Twilio WhatsApp (plain-text messages — simpler than Meta templates)
+#
+# To enable, set these env vars:
+#   TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+#   TWILIO_AUTH_TOKEN=<your-auth-token>
+#   TWILIO_WHATSAPP_FROM=whatsapp:+14155238886   (Twilio sandbox number)
+# ─────────────────────────────────────────────────────────────────────────────
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  whatsapp-from: ${TWILIO_WHATSAPP_FROM:whatsapp:+14155238886}
+
+# Stripe
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_xxx}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_xxx}
+  currency: inr
+
+# RabbitMQ Queues
+rabbitmq:
+  enabled: ${RABBITMQ_ENABLED:false}
+  exchange: busymumkitchen.exchange
+  queues:
+    order-created: order.created.queue
+    order-updated: order.updated.queue
+    notification: notification.queue
+    analytics: analytics.queue
+  routing-keys:
+    order-created: order.created
+    order-updated: order.updated
+    notification: notification.send
+    analytics: analytics.track
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    rabbit:
+      enabled: ${RABBITMQ_ENABLED:false}
+    redis:
+      enabled: ${REDIS_ENABLED:false}
+
+# OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+# Logging
+logging:
+  level:
+    com.busymumkitchen: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
