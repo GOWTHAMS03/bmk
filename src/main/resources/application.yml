@@ -9,9 +9,9 @@ spring:
 
   # PostgreSQL
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:busymumkitchen}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:admin1234}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
+    username: ${DB_USERNAME:bmk_user}
+    password: ${DB_PASSWORD:g6WHozzFeFYljHO2D8eYrMhSgTMq3WeU}
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
