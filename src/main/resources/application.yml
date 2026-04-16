@@ -7,13 +7,6 @@ spring:
   application:
     name: busymumkitchen
 
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
-      - org.springframework.boot.autoconfigure.mongo.MongoReactiveAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.mongo.MongoReactiveDataAutoConfiguration
-
   # PostgreSQL
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
@@ -44,7 +37,7 @@ spring:
   # MongoDB
   data:
     mongodb:
-      uri: ${MONGODB_URI:spring.data.mongodb.uri=mongodb+srv://bmk:Suh8uAJIVUXPO6Nw@cluster0.acq0sal.mongodb.net/bmk?retryWrites=true&w=majority}
+      uri: ${MONGODB_URI:mongodb://localhost:27017/busymumkitchen_logs}
     # Redis Cache
     redis:
       host: ${REDIS_HOST:localhost}
@@ -61,25 +54,27 @@ spring:
   cache:
     type: ${CACHE_TYPE:simple}
 
+  # RabbitMQ – connection details only matter when rabbitmq.enabled=true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    listener:
+      simple:
+        auto-startup: ${RABBITMQ_ENABLED:false}
+
+  # Jackson
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
 # Redis enabled flag (false = in-memory fallback for local dev)
 redis:
   enabled: ${REDIS_ENABLED:false}
 
-# RabbitMQ – connection details only matter when rabbitmq.enabled=true
-spring.rabbitmq:
-  host: ${RABBITMQ_HOST:localhost}
-  port: ${RABBITMQ_PORT:5672}
-  username: ${RABBITMQ_USER:guest}
-  password: ${RABBITMQ_PASS:guest}
-  listener:
-    simple:
-      auto-startup: ${RABBITMQ_ENABLED:false}
 
-# Jackson
-spring.jackson:
-  serialization:
-    write-dates-as-timestamps: false
-  default-property-inclusion: non_null
 
 # JWT Configuration
 jwt:

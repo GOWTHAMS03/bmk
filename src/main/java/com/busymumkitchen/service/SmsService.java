@@ -22,7 +22,7 @@ public class SmsService {
 
     @Autowired
     public SmsService(@Autowired(required = false) SnsClient snsClient,
-                      NotificationLogRepository notificationLogRepository) {
+                      @Autowired(required = false) NotificationLogRepository notificationLogRepository) {
         this.snsClient = snsClient;
         this.notificationLogRepository = notificationLogRepository;
     }
@@ -77,7 +77,11 @@ public class SmsService {
             log.info("[SNS DISABLED] Would send SMS to {}: {}", maskPhone(phoneNumber), message);
             logEntry.setStatus("SIMULATED");
             logEntry.setProviderMessageId("SIMULATED");
-            notificationLogRepository.save(logEntry);
+            if (notificationLogRepository != null) {
+                notificationLogRepository.save(logEntry);
+            } else {
+                log.warn("NotificationLogRepository not available — skipping save for simulated SMS to {}", maskPhone(phoneNumber));
+            }
             return;
             }
 
@@ -107,7 +111,11 @@ public class SmsService {
             log.error("Failed to send SMS to {}: {}", maskPhone(phoneNumber), e.getMessage());
         }
 
-        notificationLogRepository.save(logEntry);
+        if (notificationLogRepository != null) {
+            notificationLogRepository.save(logEntry);
+        } else {
+            log.warn("NotificationLogRepository not available — skipping save for SMS to {}", maskPhone(phoneNumber));
+        }
     }
 
     private String maskPhone(String phone) {
