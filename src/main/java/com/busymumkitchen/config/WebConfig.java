@@ -16,24 +16,16 @@ import java.util.List;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    private static final List<String> ALLOWED_ORIGINS = List.of(
-            "http://localhost:4200",
-            "http://localhost:4201",
-            "http://localhost",
-            "https://busymumkitchen.com",
-            "https://www.busymumkitchen.com",
-            "https://admin.busymumkitchen.com",
-            "https://api.busymumkitchen.com"
-    );
-
     /**
-     * Used by Spring Security's .cors() to handle CORS before the security filter chain.
-     * This must be a @Bean so Spring Security can auto-discover it by name "corsConfigurationSource".
+     * Allows all origins (Angular web app, Flutter mobile, localhost dev, Render, etc.)
+     * using allowedOriginPatterns("*") which supports allowCredentials(true) — unlike
+     * a plain wildcard setAllowedOrigins("*") which cannot be used with credentials.
+     * Flutter mobile apps never send an Origin header so CORS does not apply to them.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(ALLOWED_ORIGINS);
+        config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
@@ -49,7 +41,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins(ALLOWED_ORIGINS.toArray(String[]::new))
+                .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .exposedHeaders("Authorization", "Content-Disposition")
