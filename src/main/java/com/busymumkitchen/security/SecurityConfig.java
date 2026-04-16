@@ -20,7 +20,7 @@ import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+// @EnableMethodSecurity  // TODO: re-enable when login is turned back on
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -46,9 +46,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/restaurants/*/categories").permitAll()
                         .requestMatchers(HttpMethod.GET, "/restaurants/*/menu").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/delivery/**").hasRole("DELIVERY_PARTNER")
-                        .anyRequest().authenticated()
+                        // TODO: restore role checks when login is turned back on
+                        // .requestMatchers("/admin/**").hasRole("ADMIN")
+                        // .requestMatchers("/delivery/**").hasRole("DELIVERY_PARTNER")
+                        .anyRequest().permitAll()
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {

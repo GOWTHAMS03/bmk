@@ -78,7 +78,11 @@ public class SmsService {
             logEntry.setStatus("SIMULATED");
             logEntry.setProviderMessageId("SIMULATED");
             if (notificationLogRepository != null) {
-                notificationLogRepository.save(logEntry);
+                try {
+                    notificationLogRepository.save(logEntry);
+                } catch (Exception mongoEx) {
+                    log.warn("MongoDB unavailable — skipping notification log for {}: {}", maskPhone(phoneNumber), mongoEx.getMessage());
+                }
             } else {
                 log.warn("NotificationLogRepository not available — skipping save for simulated SMS to {}", maskPhone(phoneNumber));
             }
@@ -112,7 +116,11 @@ public class SmsService {
         }
 
         if (notificationLogRepository != null) {
-            notificationLogRepository.save(logEntry);
+            try {
+                notificationLogRepository.save(logEntry);
+            } catch (Exception mongoEx) {
+                log.warn("MongoDB unavailable — skipping notification log for {}: {}", maskPhone(phoneNumber), mongoEx.getMessage());
+            }
         } else {
             log.warn("NotificationLogRepository not available — skipping save for SMS to {}", maskPhone(phoneNumber));
         }
