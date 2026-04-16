@@ -7,6 +7,13 @@ spring:
   application:
     name: busymumkitchen
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.mongo.MongoReactiveAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoReactiveDataAutoConfiguration
+
   # PostgreSQL
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
@@ -37,7 +44,7 @@ spring:
   # MongoDB
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/busymumkitchen_logs}
+      uri: ${MONGODB_URI:spring.data.mongodb.uri=mongodb+srv://bmk:Suh8uAJIVUXPO6Nw@cluster0.acq0sal.mongodb.net/bmk?retryWrites=true&w=majority}
     # Redis Cache
     redis:
       host: ${REDIS_HOST:localhost}
