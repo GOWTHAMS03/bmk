@@ -9,8 +9,8 @@ import com.busymumkitchen.model.*;
 import com.busymumkitchen.model.enums.OrderStatus;
 import com.busymumkitchen.model.enums.PaymentStatus;
 import com.busymumkitchen.repository.*;
+import com.busymumkitchen.model.ProductionQueue;
 import com.busymumkitchen.messaging.OrderEventPublisher;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,18 +39,8 @@ public class OrderService {
     private final OrderEventPublisher orderEventPublisher;
     private final WhatsAppService whatsAppService;
     private final SseNotificationService sseNotificationService;
-
-    private final AtomicLong orderCounter = new AtomicLong(0);
-
-    @PostConstruct
-    void initOrderCounter() {
-        try {
-            long count = orderRepository.count();
-            orderCounter.set(count + 1000);
-        } catch (Exception e) {
-            orderCounter.set(1000);
-        }
-    }
+    private final OrderNumberService orderNumberService;
+    private final ProductionQueueRepository productionQueueRepository;
 
     @Transactional
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request) {
@@ -62,9 +51,11 @@ public class OrderService {
         }
 
         // Build order
+        String dailyNumber = orderNumberService.getNextDailyNumber();
         Order order = Order.builder()
                 .user(User.builder().build())
                 .orderNumber(generateOrderNumber())
+                .dailyOrderNumber(dailyNumber)
                 .status(OrderStatus.PLACED)
                 .customerName(request.getCustomerName())
                 .customerPhone(request.getCustomerPhone())
@@ -110,6 +101,14 @@ public class OrderService {
 
         order.calculateTotals();
         Order savedOrder = orderRepository.save(order);
+
+        // Create production queue entry for kitchen
+        ProductionQueue pq = ProductionQueue.builder()
+                .order(savedOrder)
+                .estimatedPrepMins(15) // default 15 mins, can be calculated from items
+                .build();
+        productionQueueRepository.save(pq);
+        savedOrder.setEstimatedPrepMinutes(15);
 
         // Create Stripe payment intent
         String clientSecret = null;
@@ -236,8 +235,9 @@ public class OrderService {
 
     private void validateStatusTransition(OrderStatus current, OrderStatus next) {
         boolean valid = switch (current) {
-            case PLACED -> next == OrderStatus.CONFIRMED || next == OrderStatus.CANCELLED;
-            case CONFIRMED -> next == OrderStatus.PREPARING || next == OrderStatus.CANCELLED;
+            case PLACED -> next == OrderStatus.ACCEPTED || next == OrderStatus.CONFIRMED || next == OrderStatus.CANCELLED;
+            case CONFIRMED -> next == OrderStatus.ACCEPTED || next == OrderStatus.PREPARING || next == OrderStatus.CANCELLED;
+            case ACCEPTED -> next == OrderStatus.PREPARING || next == OrderStatus.CANCELLED;
             case PREPARING -> next == OrderStatus.READY_FOR_PICKUP || next == OrderStatus.CANCELLED;
             case READY_FOR_PICKUP -> next == OrderStatus.OUT_FOR_DELIVERY || next == OrderStatus.DELIVERED;
             case OUT_FOR_DELIVERY -> next == OrderStatus.DELIVERED;
@@ -252,9 +252,8 @@ public class OrderService {
     }
 
     private String generateOrderNumber() {
-        // Generate 6-digit order number (100000 to 999999)
-        long counter = orderCounter.incrementAndGet();
-        return String.format("%06d", 100000 + (counter % 900000));
+        // Unique order number for DB (UUID-based, not displayed to customer)
+        return "BMK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     /**
@@ -299,6 +298,7 @@ private void sendWhatsAppForStatus(Order order) {
         return OrderResponse.builder()
                 .id(order.getId())
                 .orderNumber(order.getOrderNumber())
+                .dailyOrderNumber(order.getDailyOrderNumber())
                 .status(order.getStatus())
                 .items(items)
                 .totalAmount(order.getTotalAmount())
@@ -313,6 +313,10 @@ private void sendWhatsAppForStatus(Order order) {
                 .notes(order.getNotes())
                 .paymentStatus(paymentStatus)
                 .stripeClientSecret(clientSecret)
+                .estimatedPrepMinutes(order.getEstimatedPrepMinutes())
+                .acceptedAt(order.getAcceptedAt())
+                .prepStartedAt(order.getPrepStartedAt())
+                .readyAt(order.getReadyAt())
                 .createdAt(order.getCreatedAt())
                 .build();
     }

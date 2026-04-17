@@ -18,6 +18,7 @@ import java.util.UUID;
 public class OrderResponse {
     private UUID id;
     private String orderNumber;
+    private String dailyOrderNumber;
     private OrderStatus status;
     private List<OrderItemResponse> items;
     private BigDecimal totalAmount;
@@ -32,6 +33,10 @@ public class OrderResponse {
     private String notes;
     private String paymentStatus;
     private String stripeClientSecret;
+    private Integer estimatedPrepMinutes;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime prepStartedAt;
+    private LocalDateTime readyAt;
     private LocalDateTime createdAt;
 
     @Data

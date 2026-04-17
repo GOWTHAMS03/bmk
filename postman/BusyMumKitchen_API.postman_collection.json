@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "bmk-collection-v1",
-		"name": "BusyMumKitchen API",
-		"description": "Complete API collection for the BusyMumKitchen food ordering backend.\n\nBase path: `/api/v1`\n\n**Auth flow:** Send OTP → Verify OTP (tokens auto-saved) → Use authenticated endpoints.\n\nJWT Bearer token is automatically attached via the collection-level auth setting.",
+		"_postman_id": "bmk-collection-v2",
+		"name": "BusyMumKitchen API v2",
+		"description": "Complete API collection for BusyMumKitchen — KFC-style food ordering backend.\n\nBase path: `/api/v1`\n\n## Auth Flow\n1. **Send OTP** → OTP printed in server console (dev mode)\n2. **Verify OTP** → tokens auto-saved to environment\n3. All authenticated endpoints use Bearer token automatically\n\n## Roles\n- `CUSTOMER` — orders, cart, profile\n- `ADMIN` — categories, menu, orders, coupons, analytics, customers\n- `KITCHEN_STAFF` — kitchen dashboard, queue, accept/prepare/ready\n- `DELIVERY_PARTNER` — assigned orders, delivery status\n\n## Order Flow (KFC-style)\n`PLACED → ACCEPTED → PREPARING → READY_FOR_PICKUP → OUT_FOR_DELIVERY → DELIVERED`\n\nDaily order numbers reset each day: `#001`, `#002`, `#003`...",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"auth": {
@@ -16,13 +16,192 @@
 		]
 	},
 	"variable": [],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// ─── Collection Pre-request Script ───────────────────────────────────",
+					"// Auto-refresh expired JWT tokens before every request",
+					"",
+					"(function () {",
+					"    // Skip for auth endpoints and public endpoints",
+					"    const url = pm.request.url.toString();",
+					"    if (url.includes('/auth/') || url.includes('/actuator/')) return;",
+					"    if (pm.request.auth && pm.request.auth.type === 'noauth') return;",
+					"",
+					"    const accessToken = pm.environment.get('accessToken');",
+					"    if (!accessToken) {",
+					"        console.log('⚠️ No accessToken set. Login first via Auth > Verify OTP.');",
+					"        return;",
+					"    }",
+					"",
+					"    // Decode JWT and check expiry",
+					"    try {",
+					"        const payload = JSON.parse(atob(accessToken.split('.')[1]));",
+					"        const expiresAt = payload.exp * 1000;",
+					"        const now = Date.now();",
+					"        const bufferMs = 60 * 1000; // 1 minute buffer",
+					"",
+					"        if (now >= expiresAt - bufferMs) {",
+					"            console.log('🔄 Access token expired or expiring soon. Attempting refresh...');",
+					"            const refreshToken = pm.environment.get('refreshToken');",
+					"            if (!refreshToken) {",
+					"                console.log('❌ No refreshToken available. Please login again.');",
+					"                return;",
+					"            }",
+					"",
+					"            const baseUrl = pm.environment.get('baseUrl');",
+					"            pm.sendRequest({",
+					"                url: baseUrl + '/auth/refresh-token',",
+					"                method: 'POST',",
+					"                header: { 'Content-Type': 'application/json' },",
+					"                body: {",
+					"                    mode: 'raw',",
+					"                    raw: JSON.stringify({ refreshToken: refreshToken })",
+					"                }",
+					"            }, function (err, res) {",
+					"                if (err) {",
+					"                    console.log('❌ Token refresh failed:', err);",
+					"                    return;",
+					"                }",
+					"                if (res.code === 200) {",
+					"                    const json = res.json();",
+					"                    if (json.data && json.data.accessToken) {",
+					"                        pm.environment.set('accessToken', json.data.accessToken);",
+					"                        pm.environment.set('refreshToken', json.data.refreshToken);",
+					"                        console.log('✅ Token refreshed successfully.');",
+					"",
+					"                        // Also update role-specific token if applicable",
+					"                        const role = json.data.user ? json.data.user.role : null;",
+					"                        if (role === 'ADMIN') pm.environment.set('adminAccessToken', json.data.accessToken);",
+					"                        if (role === 'KITCHEN_STAFF') pm.environment.set('kitchenAccessToken', json.data.accessToken);",
+					"                        if (role === 'DELIVERY_PARTNER') pm.environment.set('deliveryAccessToken', json.data.accessToken);",
+					"                    }",
+					"                } else {",
+					"                    console.log('❌ Token refresh returned:', res.code);",
+					"                }",
+					"            });",
+					"        }",
+					"    } catch (e) {",
+					"        console.log('⚠️ Could not decode token:', e.message);",
+					"    }",
+					"})();",
+					"",
+					"// Log request info",
+					"console.log('📤 ' + pm.request.method + ' ' + pm.request.url.toString());"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// ─── Collection Post-response Script ─────────────────────────────────",
+					"// Runs after EVERY request in the collection",
+					"",
+					"(function () {",
+					"    const responseTime = pm.response.responseTime;",
+					"    const status = pm.response.code;",
+					"    const url = pm.request.url.toString();",
+					"",
+					"    // 1. Log response summary",
+					"    console.log('📥 ' + status + ' | ' + responseTime + 'ms | ' + pm.request.method + ' ' + url);",
+					"",
+					"    // 2. Basic health checks",
+					"    pm.test('Response status is not 500 (Server Error)', function () {",
+					"        pm.expect(status).to.not.equal(500);",
+					"    });",
+					"",
+					"    pm.test('Response time < 5000ms', function () {",
+					"        pm.expect(responseTime).to.be.below(5000);",
+					"    });",
+					"",
+					"    // 3. Validate JSON structure for successful API responses",
+					"    if (status >= 200 && status < 300) {",
+					"        const contentType = pm.response.headers.get('Content-Type') || '';",
+					"        if (contentType.includes('application/json')) {",
+					"            pm.test('Response has valid JSON body', function () {",
+					"                pm.response.to.be.json;",
+					"            });",
+					"",
+					"            try {",
+					"                const json = pm.response.json();",
+					"",
+					"                pm.test('Response has success field', function () {",
+					"                    pm.expect(json).to.have.property('success');",
+					"                });",
+					"",
+					"                // Auto-extract common IDs from response data",
+					"                if (json.data) {",
+					"                    if (json.data.id && !pm.environment.get('lastCreatedId')) {",
+					"                        pm.environment.set('lastCreatedId', json.data.id);",
+					"                    }",
+					"",
+					"                    // Auto-save order details",
+					"                    if (json.data.orderNumber) {",
+					"                        pm.environment.set('orderNumber', json.data.orderNumber);",
+					"                    }",
+					"                    if (json.data.dailyOrderNumber) {",
+					"                        pm.environment.set('dailyOrderNumber', json.data.dailyOrderNumber);",
+					"                        console.log('🎫 Daily Order Number: ' + json.data.dailyOrderNumber);",
+					"                    }",
+					"                    if (json.data.status) {",
+					"                        console.log('📋 Order Status: ' + json.data.status);",
+					"                    }",
+					"                    if (json.data.estimatedPrepMinutes) {",
+					"                        console.log('⏱️ Est. Prep Time: ' + json.data.estimatedPrepMinutes + ' mins');",
+					"                    }",
+					"",
+					"                    // Kitchen dashboard stats",
+					"                    if (json.data.pendingOrders !== undefined) {",
+					"                        console.log('📊 Kitchen: ' + json.data.pendingOrders + ' pending | ' ",
+					"                            + json.data.preparingOrders + ' preparing | ' ",
+					"                            + json.data.readyOrders + ' ready');",
+					"                    }",
+					"                }",
+					"            } catch (e) {",
+					"                // Not JSON or parse error — skip",
+					"            }",
+					"        }",
+					"    }",
+					"",
+					"    // 4. Handle auth errors",
+					"    if (status === 401) {",
+					"        console.log('🔒 401 Unauthorized — Token may be expired. Run Auth > Verify OTP to get a new token.');",
+					"    }",
+					"    if (status === 403) {",
+					"        console.log('🚫 403 Forbidden — Your role does not have access to this endpoint.');",
+					"    }",
+					"",
+					"    // 5. Handle validation errors (400)",
+					"    if (status === 400) {",
+					"        try {",
+					"            const errJson = pm.response.json();",
+					"            if (errJson.message) {",
+					"                console.log('⚠️ Validation Error: ' + errJson.message);",
+					"            }",
+					"            if (errJson.errors && errJson.errors.length > 0) {",
+					"                errJson.errors.forEach(function (e) {",
+					"                    console.log('  ❌ ' + e.field + ': ' + e.message);",
+					"                });",
+					"            }",
+					"        } catch (e) { /* ignore */ }",
+					"    }",
+					"})();"
+				]
+			}
+		}
+	],
 	"item": [
 		{
 			"name": "Auth",
-			"description": "Authentication endpoints – OTP-based login, registration, and token refresh.",
+			"description": "OTP-based mobile authentication with role-based access.\n\n**Dev Mode:** OTP is printed in server console logs.\n\nFlow: Send OTP → Verify OTP → Get JWT tokens → Use authenticated endpoints.",
 			"item": [
 				{
-					"name": "Send OTP",
+					"name": "Send OTP (Customer)",
 					"request": {
 						"auth": { "type": "noauth" },
 						"method": "POST",
@@ -42,7 +221,7 @@
 					"response": []
 				},
 				{
-					"name": "Verify OTP",
+					"name": "Verify OTP (Customer)",
 					"event": [
 						{
 							"listen": "test",
@@ -72,6 +251,128 @@
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"otp\": \"{{otp}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/verify-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "verify-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send OTP (Admin)",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{adminPhoneNumber}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/send-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "send-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.accessToken) {",
+									"        pm.environment.set('adminAccessToken', json.data.accessToken);",
+									"        pm.environment.set('accessToken', json.data.accessToken);",
+									"        pm.environment.set('refreshToken', json.data.refreshToken);",
+									"    }",
+									"    if (json.data && json.data.user) {",
+									"        pm.environment.set('userId', json.data.user.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{adminPhoneNumber}}\",\n  \"otp\": \"{{otp}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/verify-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "verify-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send OTP (Kitchen Staff)",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{kitchenStaffPhone}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/send-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "send-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP (Kitchen Staff)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    if (json.data && json.data.accessToken) {",
+									"        pm.environment.set('kitchenAccessToken', json.data.accessToken);",
+									"        pm.environment.set('accessToken', json.data.accessToken);",
+									"        pm.environment.set('refreshToken', json.data.refreshToken);",
+									"    }",
+									"    if (json.data && json.data.user) {",
+									"        pm.environment.set('userId', json.data.user.id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{kitchenStaffPhone}}\",\n  \"otp\": \"{{otp}}\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/verify-otp",
@@ -119,7 +420,7 @@
 					"response": []
 				},
 				{
-					"name": "Register",
+					"name": "Register (Complete Profile)",
 					"event": [
 						{
 							"listen": "test",
@@ -290,7 +591,7 @@
 		},
 		{
 			"name": "Menu",
-			"description": "Public menu browsing – categories and menu items.",
+			"description": "Public menu browsing – categories and menu items (no auth required for GET).",
 			"item": [
 				{
 					"name": "Get Categories",
@@ -298,9 +599,9 @@
 						"auth": { "type": "noauth" },
 						"method": "GET",
 						"url": {
-							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/categories",
+							"raw": "{{baseUrl}}/categories",
 							"host": ["{{baseUrl}}"],
-							"path": ["restaurants", "{{restaurantId}}", "categories"]
+							"path": ["categories"]
 						}
 					},
 					"response": []
@@ -327,50 +628,14 @@
 						"auth": { "type": "noauth" },
 						"method": "GET",
 						"url": {
-							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/menu?page=0&size=20",
+							"raw": "{{baseUrl}}/menu-items?page=0&size=20",
 							"host": ["{{baseUrl}}"],
-							"path": ["restaurants", "{{restaurantId}}", "menu"],
+							"path": ["menu-items"],
 							"query": [
 								{ "key": "page", "value": "0" },
 								{ "key": "size", "value": "20" },
 								{ "key": "categoryId", "value": "{{categoryId}}", "disabled": true },
 								{ "key": "search", "value": "", "disabled": true }
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Menu Items by Category",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "GET",
-						"url": {
-							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/menu?categoryId={{categoryId}}&page=0&size=20",
-							"host": ["{{baseUrl}}"],
-							"path": ["restaurants", "{{restaurantId}}", "menu"],
-							"query": [
-								{ "key": "categoryId", "value": "{{categoryId}}" },
-								{ "key": "page", "value": "0" },
-								{ "key": "size", "value": "20" }
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Search Menu Items",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "GET",
-						"url": {
-							"raw": "{{baseUrl}}/restaurants/{{restaurantId}}/menu?search=chicken&page=0&size=20",
-							"host": ["{{baseUrl}}"],
-							"path": ["restaurants", "{{restaurantId}}", "menu"],
-							"query": [
-								{ "key": "search", "value": "chicken" },
-								{ "key": "page", "value": "0" },
-								{ "key": "size", "value": "20" }
 							]
 						}
 					},
@@ -385,6 +650,24 @@
 							"raw": "{{baseUrl}}/menu-items/{{menuItemId}}",
 							"host": ["{{baseUrl}}"],
 							"path": ["menu-items", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Menu Items",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/menu-items?search=chicken&page=0&size=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu-items"],
+							"query": [
+								{ "key": "search", "value": "chicken" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" }
+							]
 						}
 					},
 					"response": []
@@ -504,7 +787,7 @@
 		},
 		{
 			"name": "Orders",
-			"description": "Order creation, listing, details, and reorder.",
+			"description": "Order creation, listing, tracking with KFC-style daily order numbers.\n\nResponse includes `dailyOrderNumber` (e.g. `#001`), `estimatedPrepMinutes`, and kitchen timestamps.",
 			"item": [
 				{
 					"name": "Create Order",
@@ -514,10 +797,12 @@
 							"script": {
 								"type": "text/javascript",
 								"exec": [
-									"if (pm.response.code === 201) {",
+									"if (pm.response.code === 200 || pm.response.code === 201) {",
 									"    var json = pm.response.json();",
-									"    if (json.data && json.data.id) {",
-									"        pm.environment.set('orderId', json.data.id);",
+									"    if (json.data) {",
+									"        if (json.data.id) pm.environment.set('orderId', json.data.id);",
+									"        if (json.data.orderNumber) pm.environment.set('orderNumber', json.data.orderNumber);",
+									"        if (json.data.dailyOrderNumber) pm.environment.set('dailyOrderNumber', json.data.dailyOrderNumber);",
 									"    }",
 									"}"
 								]
@@ -559,7 +844,7 @@
 					"response": []
 				},
 				{
-					"name": "Get My Orders (filter by status)",
+					"name": "Get My Orders (by status)",
 					"request": {
 						"method": "GET",
 						"url": {
@@ -595,10 +880,11 @@
 							"script": {
 								"type": "text/javascript",
 								"exec": [
-									"if (pm.response.code === 201) {",
+									"if (pm.response.code === 200 || pm.response.code === 201) {",
 									"    var json = pm.response.json();",
-									"    if (json.data && json.data.id) {",
-									"        pm.environment.set('orderId', json.data.id);",
+									"    if (json.data) {",
+									"        if (json.data.id) pm.environment.set('orderId', json.data.id);",
+									"        if (json.data.dailyOrderNumber) pm.environment.set('dailyOrderNumber', json.data.dailyOrderNumber);",
 									"    }",
 									"}"
 								]
@@ -611,6 +897,108 @@
 							"raw": "{{baseUrl}}/orders/{{orderId}}/reorder",
 							"host": ["{{baseUrl}}"],
 							"path": ["orders", "{{orderId}}", "reorder"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Kitchen (Production)",
+			"description": "Kitchen/Production management endpoints.\n\nRequires `ADMIN` or `KITCHEN_STAFF` role.\n\n**KFC-style order flow:**\n1. `GET /kitchen/dashboard` — see pending/preparing/ready counts\n2. `GET /kitchen/queue` — see all active orders\n3. `POST /kitchen/orders/{id}/accept` — accept incoming order\n4. `POST /kitchen/orders/{id}/prepare` — start cooking\n5. `POST /kitchen/orders/{id}/ready` — mark food ready\n6. `POST /kitchen/orders/{id}/picked-up` — rider collected",
+			"item": [
+				{
+					"name": "Kitchen Dashboard",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{kitchenAccessToken}}", "type": "string" }]
+						},
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/kitchen/dashboard",
+							"host": ["{{baseUrl}}"],
+							"path": ["kitchen", "dashboard"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Active Queue",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{kitchenAccessToken}}", "type": "string" }]
+						},
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/kitchen/queue",
+							"host": ["{{baseUrl}}"],
+							"path": ["kitchen", "queue"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Accept Order",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{kitchenAccessToken}}", "type": "string" }]
+						},
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/kitchen/orders/{{orderId}}/accept",
+							"host": ["{{baseUrl}}"],
+							"path": ["kitchen", "orders", "{{orderId}}", "accept"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Start Preparing",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{kitchenAccessToken}}", "type": "string" }]
+						},
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/kitchen/orders/{{orderId}}/prepare",
+							"host": ["{{baseUrl}}"],
+							"path": ["kitchen", "orders", "{{orderId}}", "prepare"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Ready",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{kitchenAccessToken}}", "type": "string" }]
+						},
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/kitchen/orders/{{orderId}}/ready",
+							"host": ["{{baseUrl}}"],
+							"path": ["kitchen", "orders", "{{orderId}}", "ready"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Picked Up",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{kitchenAccessToken}}", "type": "string" }]
+						},
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/kitchen/orders/{{orderId}}/picked-up",
+							"host": ["{{baseUrl}}"],
+							"path": ["kitchen", "orders", "{{orderId}}", "picked-up"]
 						}
 					},
 					"response": []
@@ -658,7 +1046,7 @@
 		},
 		{
 			"name": "Notifications",
-			"description": "Server-Sent Events for real-time order updates.",
+			"description": "Server-Sent Events (SSE) for real-time order updates.\n\nConnect once, receive live status changes for your orders.",
 			"item": [
 				{
 					"name": "Subscribe to SSE Stream",
@@ -679,7 +1067,7 @@
 		},
 		{
 			"name": "Admin",
-			"description": "Admin-only endpoints. Requires ADMIN role JWT.",
+			"description": "Admin-only endpoints. Requires ADMIN role JWT.\n\nUse `adminAccessToken` or login with admin phone number first.",
 			"item": [
 				{
 					"name": "Categories",
@@ -703,6 +1091,10 @@
 								}
 							],
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "POST",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
@@ -722,6 +1114,10 @@
 						{
 							"name": "Update Category",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "PUT",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
@@ -741,6 +1137,10 @@
 						{
 							"name": "Delete Category",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "DELETE",
 								"url": {
 									"raw": "{{baseUrl}}/admin/categories/{{categoryId}}",
@@ -774,6 +1174,10 @@
 								}
 							],
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "POST",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
@@ -793,6 +1197,10 @@
 						{
 							"name": "Update Menu Item",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "PUT",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
@@ -812,6 +1220,10 @@
 						{
 							"name": "Delete Menu Item",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "DELETE",
 								"url": {
 									"raw": "{{baseUrl}}/admin/menu-items/{{menuItemId}}",
@@ -822,8 +1234,12 @@
 							"response": []
 						},
 						{
-							"name": "Toggle Menu Item Availability",
+							"name": "Toggle Availability",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "PUT",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
@@ -848,6 +1264,10 @@
 						{
 							"name": "Get All Orders",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "GET",
 								"url": {
 									"raw": "{{baseUrl}}/admin/orders?page=0&size=20",
@@ -863,15 +1283,19 @@
 							"response": []
 						},
 						{
-							"name": "Get All Orders (filter by status)",
+							"name": "Get Orders by Status (ACCEPTED)",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "GET",
 								"url": {
-									"raw": "{{baseUrl}}/admin/orders?status=CONFIRMED&page=0&size=20",
+									"raw": "{{baseUrl}}/admin/orders?status=ACCEPTED&page=0&size=20",
 									"host": ["{{baseUrl}}"],
 									"path": ["admin", "orders"],
 									"query": [
-										{ "key": "status", "value": "CONFIRMED" },
+										{ "key": "status", "value": "ACCEPTED" },
 										{ "key": "page", "value": "0" },
 										{ "key": "size", "value": "20" }
 									]
@@ -882,13 +1306,40 @@
 						{
 							"name": "Update Order Status",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "PUT",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"status\": \"CONFIRMED\",\n  \"reason\": \"Order confirmed by kitchen\"\n}"
+									"raw": "{\n  \"status\": \"ACCEPTED\",\n  \"reason\": \"Order accepted by kitchen\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/orders/{{orderId}}/status",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "orders", "{{orderId}}", "status"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Cancel Order",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"status\": \"CANCELLED\",\n  \"reason\": \"Customer requested cancellation\"\n}"
 								},
 								"url": {
 									"raw": "{{baseUrl}}/admin/orders/{{orderId}}/status",
@@ -901,6 +1352,10 @@
 						{
 							"name": "Assign Delivery Partner",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "PUT",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
@@ -925,6 +1380,10 @@
 						{
 							"name": "Get All Coupons",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "GET",
 								"url": {
 									"raw": "{{baseUrl}}/admin/coupons",
@@ -954,13 +1413,17 @@
 								}
 							],
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "POST",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"code\": \"WELCOME10\",\n  \"description\": \"10% off on your first order\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 10.00,\n  \"minOrderAmount\": 200.00,\n  \"maxDiscount\": 100.00,\n  \"usageLimit\": 1000,\n  \"validFrom\": \"2025-01-01T00:00:00\",\n  \"validUntil\": \"2026-12-31T23:59:59\",\n  \"isActive\": true\n}"
+									"raw": "{\n  \"code\": \"WELCOME10\",\n  \"description\": \"10% off on your first order\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 10.00,\n  \"minOrderAmount\": 200.00,\n  \"maxDiscount\": 100.00,\n  \"usageLimit\": 1000,\n  \"validFrom\": \"2025-01-01T00:00:00\",\n  \"validUntil\": \"2027-12-31T23:59:59\",\n  \"isActive\": true\n}"
 								},
 								"url": {
 									"raw": "{{baseUrl}}/admin/coupons",
@@ -973,13 +1436,17 @@
 						{
 							"name": "Update Coupon",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "PUT",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"code\": \"WELCOME15\",\n  \"description\": \"15% off on your first order\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 15.00,\n  \"minOrderAmount\": 300.00,\n  \"maxDiscount\": 150.00,\n  \"usageLimit\": 500,\n  \"validFrom\": \"2025-01-01T00:00:00\",\n  \"validUntil\": \"2026-12-31T23:59:59\",\n  \"isActive\": true\n}"
+									"raw": "{\n  \"code\": \"WELCOME15\",\n  \"description\": \"15% off on your first order\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 15.00,\n  \"minOrderAmount\": 300.00,\n  \"maxDiscount\": 150.00,\n  \"usageLimit\": 500,\n  \"validFrom\": \"2025-01-01T00:00:00\",\n  \"validUntil\": \"2027-12-31T23:59:59\",\n  \"isActive\": true\n}"
 								},
 								"url": {
 									"raw": "{{baseUrl}}/admin/coupons/{{couponId}}",
@@ -992,6 +1459,10 @@
 						{
 							"name": "Delete Coupon",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "DELETE",
 								"url": {
 									"raw": "{{baseUrl}}/admin/coupons/{{couponId}}",
@@ -1009,14 +1480,18 @@
 						{
 							"name": "Get Sales Analytics",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "GET",
 								"url": {
-									"raw": "{{baseUrl}}/admin/analytics/sales?from=2025-01-01&to=2026-12-31",
+									"raw": "{{baseUrl}}/admin/analytics/sales?from=2025-01-01&to=2027-12-31",
 									"host": ["{{baseUrl}}"],
 									"path": ["admin", "analytics", "sales"],
 									"query": [
 										{ "key": "from", "value": "2025-01-01" },
-										{ "key": "to", "value": "2026-12-31" }
+										{ "key": "to", "value": "2027-12-31" }
 									]
 								}
 							},
@@ -1025,14 +1500,18 @@
 						{
 							"name": "Get Revenue Chart",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "GET",
 								"url": {
-									"raw": "{{baseUrl}}/admin/analytics/revenue?from=2025-01-01&to=2026-12-31",
+									"raw": "{{baseUrl}}/admin/analytics/revenue?from=2025-01-01&to=2027-12-31",
 									"host": ["{{baseUrl}}"],
 									"path": ["admin", "analytics", "revenue"],
 									"query": [
 										{ "key": "from", "value": "2025-01-01" },
-										{ "key": "to", "value": "2026-12-31" }
+										{ "key": "to", "value": "2027-12-31" }
 									]
 								}
 							},
@@ -1046,6 +1525,10 @@
 						{
 							"name": "Get Customers",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "GET",
 								"url": {
 									"raw": "{{baseUrl}}/admin/customers?page=0&size=20",
@@ -1063,6 +1546,10 @@
 						{
 							"name": "Search Customers",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "GET",
 								"url": {
 									"raw": "{{baseUrl}}/admin/customers?search=test&page=0&size=20",
@@ -1078,8 +1565,12 @@
 							"response": []
 						},
 						{
-							"name": "Update Customer Status",
+							"name": "Deactivate Customer",
 							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
 								"method": "PUT",
 								"header": [
 									{ "key": "Content-Type", "value": "application/json" }
@@ -1087,6 +1578,29 @@
 								"body": {
 									"mode": "raw",
 									"raw": "{\n  \"active\": false\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/admin/customers/{{userId}}/status",
+									"host": ["{{baseUrl}}"],
+									"path": ["admin", "customers", "{{userId}}", "status"]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Activate Customer",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }]
+								},
+								"method": "PUT",
+								"header": [
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"active\": true\n}"
 								},
 								"url": {
 									"raw": "{{baseUrl}}/admin/customers/{{userId}}/status",
@@ -1107,6 +1621,10 @@
 				{
 					"name": "Get Delivery Profile",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "GET",
 						"url": {
 							"raw": "{{baseUrl}}/delivery/profile",
@@ -1119,6 +1637,10 @@
 				{
 					"name": "Get Assigned Orders",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "GET",
 						"url": {
 							"raw": "{{baseUrl}}/delivery/orders",
@@ -1131,6 +1653,10 @@
 				{
 					"name": "Accept Order",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "PUT",
 						"url": {
 							"raw": "{{baseUrl}}/delivery/orders/{{orderId}}/accept",
@@ -1143,6 +1669,10 @@
 				{
 					"name": "Reject Order",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "PUT",
 						"url": {
 							"raw": "{{baseUrl}}/delivery/orders/{{orderId}}/reject",
@@ -1155,6 +1685,10 @@
 				{
 					"name": "Update Delivery Status",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "PUT",
 						"header": [
 							{ "key": "Content-Type", "value": "application/json" }
@@ -1174,6 +1708,10 @@
 				{
 					"name": "Update Location",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "PUT",
 						"header": [
 							{ "key": "Content-Type", "value": "application/json" }
@@ -1193,6 +1731,10 @@
 				{
 					"name": "Toggle Availability",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "PUT",
 						"header": [
 							{ "key": "Content-Type", "value": "application/json" }
@@ -1212,27 +1754,19 @@
 				{
 					"name": "Get Earnings",
 					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [{ "key": "token", "value": "{{deliveryAccessToken}}", "type": "string" }]
+						},
 						"method": "GET",
 						"url": {
-							"raw": "{{baseUrl}}/delivery/earnings?from=2025-01-01&to=2026-12-31",
+							"raw": "{{baseUrl}}/delivery/earnings?from=2025-01-01&to=2027-12-31",
 							"host": ["{{baseUrl}}"],
 							"path": ["delivery", "earnings"],
 							"query": [
 								{ "key": "from", "value": "2025-01-01" },
-								{ "key": "to", "value": "2026-12-31" }
+								{ "key": "to", "value": "2027-12-31" }
 							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Earnings (default last 30 days)",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{baseUrl}}/delivery/earnings",
-							"host": ["{{baseUrl}}"],
-							"path": ["delivery", "earnings"]
 						}
 					},
 					"response": []
@@ -1241,7 +1775,7 @@
 		},
 		{
 			"name": "Health Check",
-			"description": "Actuator health endpoint (public).",
+			"description": "Actuator health endpoint (public, no auth).",
 			"item": [
 				{
 					"name": "Health",
@@ -1260,4 +1794,3 @@
 		}
 	]
 }
-

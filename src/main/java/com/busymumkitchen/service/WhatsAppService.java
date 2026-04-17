@@ -202,6 +202,9 @@ public class WhatsAppService {
             case CONFIRMED ->
                 "✅ Your order *" + orderNumber + "* is confirmed. "
                 + "We are now preparing your food 🍗 Please allow 20-30 minutes.";
+            case ACCEPTED ->
+                "👍 Your order *" + orderNumber + "* has been accepted! "
+                + "Our kitchen is getting ready to prepare your meal 🍳";
             case PREPARING ->
                 "\uD83C\uDF73 Great news! Your order *" + orderNumber + "* is being prepared. "
                 + "Our chefs are cooking your meal fresh just for you \uD83D\uDD25";

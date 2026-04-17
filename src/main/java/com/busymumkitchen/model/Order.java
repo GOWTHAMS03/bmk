@@ -79,6 +79,21 @@ public class Order extends BaseEntity {
     @Column(name = "customer_phone", length = 20)
     private String customerPhone;
 
+    @Column(name = "daily_order_number", length = 10)
+    private String dailyOrderNumber;
+
+    @Column(name = "accepted_at")
+    private LocalDateTime acceptedAt;
+
+    @Column(name = "prep_started_at")
+    private LocalDateTime prepStartedAt;
+
+    @Column(name = "ready_at")
+    private LocalDateTime readyAt;
+
+    @Column(name = "estimated_prep_minutes")
+    private Integer estimatedPrepMinutes;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
