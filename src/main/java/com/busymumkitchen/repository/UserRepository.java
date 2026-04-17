@@ -21,6 +21,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByEmailAndRole(String email, UserRole role);
+
     Page<User> findByRole(UserRole role, Pageable pageable);
 
     @Query("SELECT u FROM User u WHERE u.role = :role AND " +

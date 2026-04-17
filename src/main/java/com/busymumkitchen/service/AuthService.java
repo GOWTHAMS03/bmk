@@ -10,6 +10,7 @@ import com.busymumkitchen.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +43,7 @@ public class AuthService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String OTP_PREFIX = "otp:";
     private static final String OTP_ATTEMPTS_PREFIX = "otp_attempts:";
+    private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder(12);
 
     public void sendOtp(SendOtpRequest request) {
         String phoneNumber = request.getPhoneNumber();
@@ -169,6 +171,46 @@ public class AuthService {
                         .isNewUser(isNewUser)
                         .build())
                 .build();
+    }
+
+    // ── Admin Email + Password Login ──────────────────────────────────────────
+
+    public AuthResponse adminLogin(AdminLoginRequest request) {
+        User admin = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BadRequestException("Invalid credentials"));
+
+        if (admin.getRole() != UserRole.ADMIN) {
+            throw new BadRequestException("Invalid credentials");
+        }
+
+        if (admin.getPasswordHash() == null) {
+            throw new BadRequestException("Password not set. Please log in via OTP first and set your password.");
+        }
+
+        if (!PASSWORD_ENCODER.matches(request.getPassword(), admin.getPasswordHash())) {
+            throw new BadRequestException("Invalid credentials");
+        }
+
+        if (!admin.getIsActive()) {
+            throw new BadRequestException("Account is deactivated. Contact support.");
+        }
+
+        log.info("Admin login successful for email: {}", request.getEmail());
+        return buildAuthResponse(admin, false);
+    }
+
+    @Transactional
+    public void setAdminPassword(String adminId, String newPassword) {
+        User admin = userRepository.findById(java.util.UUID.fromString(adminId))
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (admin.getRole() != UserRole.ADMIN) {
+            throw new BadRequestException("Only admin accounts can set passwords via this endpoint");
+        }
+
+        admin.setPasswordHash(PASSWORD_ENCODER.encode(newPassword));
+        userRepository.save(admin);
+        log.info("Admin password updated for userId: {}", adminId);
     }
 
     private String generateOtp() {
