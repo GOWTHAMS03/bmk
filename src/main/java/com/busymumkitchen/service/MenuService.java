@@ -144,11 +144,11 @@ public class MenuService {
                 .price(request.getPrice())
                 .discountedPrice(request.getDiscountedPrice())
                 .imageUrl(request.getImageUrl())
-                .isVegetarian(request.getIsVegetarian())
-                .isVegan(request.getIsVegan())
-                .isGlutenFree(request.getIsGlutenFree())
-                .isAvailable(request.getIsAvailable())
-                .preparationTimeMins(request.getPreparationTimeMins())
+                .isVegetarian(Boolean.TRUE.equals(request.getVegetarian()))
+                .isVegan(Boolean.TRUE.equals(request.getVegan()))
+                .isGlutenFree(Boolean.TRUE.equals(request.getGlutenFree()))
+                .isAvailable(request.getAvailable() != null ? request.getAvailable() : true)
+                .preparationTimeMins(request.getPreparationTime())
                 .calories(request.getCalories())
                 .sortOrder(request.getSortOrder())
                 .stockQuantity(request.getStockQuantity())
@@ -172,11 +172,11 @@ public class MenuService {
         item.setPrice(request.getPrice());
         item.setDiscountedPrice(request.getDiscountedPrice());
         item.setImageUrl(request.getImageUrl());
-        item.setIsVegetarian(request.getIsVegetarian());
-        item.setIsVegan(request.getIsVegan());
-        item.setIsGlutenFree(request.getIsGlutenFree());
-        item.setIsAvailable(request.getIsAvailable());
-        item.setPreparationTimeMins(request.getPreparationTimeMins());
+        item.setIsVegetarian(Boolean.TRUE.equals(request.getVegetarian()));
+        item.setIsVegan(Boolean.TRUE.equals(request.getVegan()));
+        item.setIsGlutenFree(Boolean.TRUE.equals(request.getGlutenFree()));
+        item.setIsAvailable(request.getAvailable() != null ? request.getAvailable() : true);
+        item.setPreparationTimeMins(request.getPreparationTime());
         item.setCalories(request.getCalories());
         item.setSortOrder(request.getSortOrder());
         item.setStockQuantity(request.getStockQuantity());
