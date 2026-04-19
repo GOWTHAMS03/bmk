@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/admin")
@@ -163,12 +164,25 @@ public class AdminController {
         Double revenue = orderRepository.totalRevenueBetween(start, end);
         long totalCustomers = userRepository.countByRole(UserRole.CUSTOMER);
 
-        return ResponseEntity.ok(ApiResponse.success(Map.of(
-                "totalOrders", totalOrders,
-                "totalRevenue", revenue != null ? revenue : 0.0,
-                "totalCustomers", totalCustomers,
-                "ordersByStatus", orderRepository.countByStatus()
-        )));
+        // Convert List<Object[]> → Map<String, Long> so Flutter can parse it as a JSON object
+        Map<String, Long> statusCounts = orderRepository.countByStatus().stream()
+                .collect(Collectors.toMap(
+                        row -> row[0].toString(),
+                        row -> ((Number) row[1]).longValue()));
+
+        long pendingOrders = statusCounts.getOrDefault("PLACED", 0L)
+                + statusCounts.getOrDefault("CONFIRMED", 0L)
+                + statusCounts.getOrDefault("ACCEPTED", 0L)
+                + statusCounts.getOrDefault("PREPARING", 0L);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalOrders", totalOrders);
+        result.put("totalRevenue", revenue != null ? revenue : 0.0);
+        result.put("totalCustomers", totalCustomers);
+        result.put("pendingOrders", pendingOrders);
+        result.put("ordersByStatus", statusCounts);
+
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     @GetMapping("/analytics/revenue")
