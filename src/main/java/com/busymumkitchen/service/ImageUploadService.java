@@ -34,6 +34,13 @@ public class ImageUploadService {
 
     private static final List<String> ALLOWED_TYPES =
             Arrays.asList("image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif");
+    private static final Map<String, String> EXT_TO_MIME = Map.of(
+            "jpg",  "image/jpeg",
+            "jpeg", "image/jpeg",
+            "png",  "image/png",
+            "webp", "image/webp",
+            "gif",  "image/gif"
+    );
     private static final long MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
     @PostConstruct
@@ -109,9 +116,17 @@ public class ImageUploadService {
             throw new BadRequestException("No file provided");
         }
         String contentType = file.getContentType();
+        // When mobile clients send application/octet-stream, resolve by file extension
+        if (contentType == null || contentType.equalsIgnoreCase("application/octet-stream")) {
+            String filename = file.getOriginalFilename();
+            if (filename != null && filename.contains(".")) {
+                String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+                contentType = EXT_TO_MIME.get(ext);
+            }
+        }
         if (contentType == null || !ALLOWED_TYPES.contains(contentType.toLowerCase())) {
             throw new BadRequestException(
-                    "Invalid file type. Allowed: JPEG, PNG, WebP, GIF. Got: " + contentType);
+                    "Invalid file type. Allowed: JPEG, PNG, WebP, GIF. Got: " + file.getContentType());
         }
         if (file.getSize() > MAX_SIZE_BYTES) {
             throw new BadRequestException(
