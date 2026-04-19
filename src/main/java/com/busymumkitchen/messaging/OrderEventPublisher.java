@@ -40,69 +40,77 @@ public class OrderEventPublisher {
     }
 
     public void publishOrderCreated(Order order) {
-        Map<String, Object> event = Map.of(
-                "eventType", "ORDER_CREATED",
-                "orderId", order.getId().toString(),
-                "orderNumber", order.getOrderNumber(),
-                "userId", order.getUser().getId().toString(),
-                "totalAmount", order.getFinalAmount().toString(),
-                "itemCount", order.getItems().size()
-        );
+                String userId = null;
+                if (order.getUser() != null && order.getUser().getId() != null) {
+                        userId = order.getUser().getId().toString();
+                }
 
-        if (enabled && rabbitTemplate != null) {
-            rabbitTemplate.convertAndSend(exchange, orderCreatedKey, event);
-            log.info("Published ORDER_CREATED event for order: {}", order.getOrderNumber());
+                java.util.Map<String, Object> event = new java.util.HashMap<>();
+                event.put("eventType", "ORDER_CREATED");
+                event.put("orderId", order.getId().toString());
+                event.put("orderNumber", order.getOrderNumber());
+                if (userId != null) event.put("userId", userId);
+                event.put("totalAmount", order.getFinalAmount() != null ? order.getFinalAmount().toString() : null);
+                event.put("itemCount", order.getItems() != null ? order.getItems().size() : 0);
 
-            // Also send notification event
-            rabbitTemplate.convertAndSend(exchange, notificationKey, Map.of(
-                    "type", "ORDER_CREATED",
-                    "orderId", order.getId().toString(),
-                    "orderNumber", order.getOrderNumber(),
-                    "userId", order.getUser().getId().toString()
-            ));
+                if (enabled && rabbitTemplate != null) {
+                        rabbitTemplate.convertAndSend(exchange, orderCreatedKey, event);
+                        log.info("Published ORDER_CREATED event for order: {}", order.getOrderNumber());
 
-            // Analytics event
-            rabbitTemplate.convertAndSend(exchange, analyticsKey, Map.of(
-                    "eventType", "ORDER_PLACED",
-                    "userId", order.getUser().getId().toString(),
-                    "data", Map.of(
-                            "orderId", order.getId().toString(),
-                            "amount", order.getFinalAmount().toString(),
-                            "itemCount", order.getItems().size()
-                    )
-            ));
-        } else {
-            log.info("[DEV MODE] ORDER_CREATED event (RabbitMQ disabled): order={}, user={}, amount={}",
-                    order.getOrderNumber(), order.getUser().getId(), order.getFinalAmount());
-        }
+                        // Also send notification event
+                        java.util.Map<String, Object> notif = new java.util.HashMap<>();
+                        notif.put("type", "ORDER_CREATED");
+                        notif.put("orderId", order.getId().toString());
+                        notif.put("orderNumber", order.getOrderNumber());
+                        if (userId != null) notif.put("userId", userId);
+                        rabbitTemplate.convertAndSend(exchange, notificationKey, notif);
+
+                        // Analytics event
+                        java.util.Map<String, Object> analytics = new java.util.HashMap<>();
+                        analytics.put("eventType", "ORDER_PLACED");
+                        if (userId != null) analytics.put("userId", userId);
+                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("orderId", order.getId().toString());
+                        data.put("amount", order.getFinalAmount() != null ? order.getFinalAmount().toString() : "0");
+                        data.put("itemCount", order.getItems() != null ? order.getItems().size() : 0);
+                        analytics.put("data", data);
+                        rabbitTemplate.convertAndSend(exchange, analyticsKey, analytics);
+                } else {
+                        log.info("[DEV MODE] ORDER_CREATED event (RabbitMQ disabled): order={}, user={}, amount={}",
+                                        order.getOrderNumber(), userId, order.getFinalAmount());
+                }
     }
 
-    public void publishOrderUpdated(Order order, OrderStatus previousStatus) {
-        Map<String, Object> event = Map.of(
-                "eventType", "ORDER_UPDATED",
-                "orderId", order.getId().toString(),
-                "orderNumber", order.getOrderNumber(),
-                "previousStatus", previousStatus.name(),
-                "newStatus", order.getStatus().name(),
-                "userId", order.getUser().getId().toString()
-        );
+        public void publishOrderUpdated(Order order, OrderStatus previousStatus) {
+                String userId = null;
+                if (order.getUser() != null && order.getUser().getId() != null) {
+                        userId = order.getUser().getId().toString();
+                }
 
-        if (enabled && rabbitTemplate != null) {
-            rabbitTemplate.convertAndSend(exchange, orderUpdatedKey, event);
-            log.info("Published ORDER_UPDATED event for order: {} ({} -> {})",
-                    order.getOrderNumber(), previousStatus, order.getStatus());
+                java.util.Map<String, Object> event = new java.util.HashMap<>();
+                event.put("eventType", "ORDER_UPDATED");
+                event.put("orderId", order.getId().toString());
+                event.put("orderNumber", order.getOrderNumber());
+                event.put("previousStatus", previousStatus != null ? previousStatus.name() : null);
+                event.put("newStatus", order.getStatus() != null ? order.getStatus().name() : null);
+                if (userId != null) event.put("userId", userId);
 
-            // Send notification
-            rabbitTemplate.convertAndSend(exchange, notificationKey, Map.of(
-                    "type", "ORDER_STATUS_CHANGED",
-                    "orderId", order.getId().toString(),
-                    "orderNumber", order.getOrderNumber(),
-                    "userId", order.getUser().getId().toString(),
-                    "newStatus", order.getStatus().name()
-            ));
-        } else {
-            log.info("[DEV MODE] ORDER_UPDATED event (RabbitMQ disabled): order={}, {} -> {}",
-                    order.getOrderNumber(), previousStatus, order.getStatus());
+                if (enabled && rabbitTemplate != null) {
+                        rabbitTemplate.convertAndSend(exchange, orderUpdatedKey, event);
+                        log.info("Published ORDER_UPDATED event for order: {} ({} -> {})",
+                                        order.getOrderNumber(), previousStatus, order.getStatus());
+
+                        // Send notification
+                        java.util.Map<String, Object> notif = new java.util.HashMap<>();
+                        notif.put("type", "ORDER_STATUS_CHANGED");
+                        notif.put("orderId", order.getId().toString());
+                        notif.put("orderNumber", order.getOrderNumber());
+                        if (userId != null) notif.put("userId", userId);
+                        notif.put("newStatus", order.getStatus() != null ? order.getStatus().name() : null);
+                        rabbitTemplate.convertAndSend(exchange, notificationKey, notif);
+                } else {
+                        log.info("[DEV MODE] ORDER_UPDATED event (RabbitMQ disabled): order={}, {} -> {}",
+                                        order.getOrderNumber(), previousStatus, order.getStatus());
+                }
         }
-    }
 }

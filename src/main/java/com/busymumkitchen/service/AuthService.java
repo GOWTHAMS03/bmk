@@ -51,10 +51,12 @@ public class AuthService {
     private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder(12);
 
     public void sendOtp(SendOtpRequest request) {
-        String phoneNumber = request.getPhoneNumber();
+        // Determine identifier: prefer phone, fall back to email
+        boolean useEmail = (request.getPhoneNumber() == null || request.getPhoneNumber().isBlank());
+        String identifier = useEmail ? request.getEmail() : request.getPhoneNumber();
 
         // Check rate limiting
-        String attemptsKey = OTP_ATTEMPTS_PREFIX + phoneNumber;
+        String attemptsKey = OTP_ATTEMPTS_PREFIX + identifier;
         Integer attempts = (Integer) keyValueStore.getValue(attemptsKey);
         if (attempts != null && attempts >= maxOtpAttempts) {
             throw new BadRequestException("Too many OTP requests. Please try again later.");
@@ -63,59 +65,69 @@ public class AuthService {
         // Generate OTP (in DEV mode, always use fixed "123456")
         String otp = "DEV".equalsIgnoreCase(otpDeliveryMethod) ? "123456" : generateOtp();
 
-        // Store OTP
-        String otpKey = OTP_PREFIX + phoneNumber;
+        // Store OTP keyed by the identifier (phone or email)
+        String otpKey = OTP_PREFIX + identifier;
         keyValueStore.setValue(otpKey, otp, Duration.ofSeconds(otpExpirySeconds));
 
         // Track attempts
         keyValueStore.increment(attemptsKey);
         keyValueStore.expire(attemptsKey, Duration.ofMinutes(30));
 
-        // Deliver OTP based on configured method
+        if (useEmail) {
+            // Email-based OTP
+            switch (otpDeliveryMethod.toUpperCase()) {
+                case "DEV" -> log.warn("\n=====================================================\n" +
+                         "  [DEV MODE] OTP = 123456 (always)                    \n" +
+                         "  Email  : {}                                         \n" +
+                         "  Method : DEV (free, no email sent)                  \n" +
+                         "=====================================================\n",
+                         identifier);
+                default -> emailOtpService.sendOtpEmail(identifier, otp);
+            }
+            return;
+        }
+
+        // Phone-based OTP
+        String phoneNumber = request.getPhoneNumber();
+        String deliveryEmail = request.getEmail();
+
         switch (otpDeliveryMethod.toUpperCase()) {
             case "EMAIL" -> {
-                // Email-based OTP (FREE via Gmail SMTP)
-                String email = request.getEmail();
-                if (email == null || email.isBlank()) {
-                    // Try to find email from existing user
+                // Email-based OTP delivery for phone-registered user
+                if (deliveryEmail == null || deliveryEmail.isBlank()) {
                     User existingUser = userRepository.findByPhoneNumber(phoneNumber).orElse(null);
                     if (existingUser != null && existingUser.getEmail() != null) {
-                        email = existingUser.getEmail();
+                        deliveryEmail = existingUser.getEmail();
                     }
                 }
-                if (email != null && !email.isBlank()) {
-                    emailOtpService.sendOtpEmail(email, otp);
+                if (deliveryEmail != null && !deliveryEmail.isBlank()) {
+                    emailOtpService.sendOtpEmail(deliveryEmail, otp);
                     log.info("OTP sent via EMAIL to user with phone: {}", phoneNumber);
                 } else {
-                    // Fallback: log to console if no email available
                     log.warn("No email found for {}. OTP: {} (provide email in request or register first)", phoneNumber, otp);
                 }
             }
-            case "SMS" -> {
-                // SMS-based OTP (Twilio/AWS SNS — paid)
-                smsService.sendOtp(phoneNumber, otp);
-            }
-            default -> {
-                // DEV mode — fixed OTP "123456", printed to console
-                log.warn("\n=====================================================\n" +
-                         "  [DEV MODE] OTP = 123456 (always)                    \n" +
-                         "  Phone  : {}                                         \n" +
-                         "  Method : DEV (free, no SMS/email sent)              \n" +
-                         "  → Set OTP_DELIVERY_METHOD=EMAIL for free email OTP  \n" +
-                         "  → Set OTP_DELIVERY_METHOD=SMS for paid SMS OTP      \n" +
-                         "=====================================================\n",
-                         phoneNumber);
-            }
+            case "SMS" -> smsService.sendOtp(phoneNumber, otp);
+            default -> log.warn("\n=====================================================\n" +
+                     "  [DEV MODE] OTP = 123456 (always)                    \n" +
+                     "  Phone  : {}                                         \n" +
+                     "  Method : DEV (free, no SMS/email sent)              \n" +
+                     "  → Set OTP_DELIVERY_METHOD=EMAIL for free email OTP  \n" +
+                     "  → Set OTP_DELIVERY_METHOD=SMS for paid SMS OTP      \n" +
+                     "=====================================================\n",
+                     phoneNumber);
         }
     }
 
     @Transactional
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
-        String phoneNumber = request.getPhoneNumber();
+        // Determine identifier: prefer phone, fall back to email
+        boolean useEmail = (request.getPhoneNumber() == null || request.getPhoneNumber().isBlank());
+        String identifier = useEmail ? request.getEmail() : request.getPhoneNumber();
         String otp = request.getOtp();
 
         // Verify OTP
-        String otpKey = OTP_PREFIX + phoneNumber;
+        String otpKey = OTP_PREFIX + identifier;
         String storedOtp = (String) keyValueStore.getValue(otpKey);
 
         if (storedOtp == null) {
@@ -128,20 +140,36 @@ public class AuthService {
 
         // Clear OTP after successful verification
         keyValueStore.delete(otpKey);
-        keyValueStore.delete(OTP_ATTEMPTS_PREFIX + phoneNumber);
+        keyValueStore.delete(OTP_ATTEMPTS_PREFIX + identifier);
 
         // Find or create user
         boolean isNewUser = false;
-        User user = userRepository.findByPhoneNumber(phoneNumber).orElse(null);
+        User user;
 
-        if (user == null) {
-            isNewUser = true;
-            user = User.builder()
-                    .phoneNumber(phoneNumber)
-                    .role(UserRole.CUSTOMER)
-                    .isActive(true)
-                    .build();
-            user = userRepository.save(user);
+        if (useEmail) {
+            // Email-based login
+            user = userRepository.findByEmail(identifier).orElse(null);
+            if (user == null) {
+                isNewUser = true;
+                user = User.builder()
+                        .email(identifier)
+                        .role(UserRole.CUSTOMER)
+                        .isActive(true)
+                        .build();
+                user = userRepository.save(user);
+            }
+        } else {
+            // Phone-based login
+            user = userRepository.findByPhoneNumber(identifier).orElse(null);
+            if (user == null) {
+                isNewUser = true;
+                user = User.builder()
+                        .phoneNumber(identifier)
+                        .role(UserRole.CUSTOMER)
+                        .isActive(true)
+                        .build();
+                user = userRepository.save(user);
+            }
         }
 
         if (!user.getIsActive()) {

@@ -172,15 +172,23 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // Publish status change event
+        // Publish status change event (publisher is now null-safe when no user attached)
         orderEventPublisher.publishOrderUpdated(savedOrder, oldStatus);
 
         // Send WhatsApp notification directly (covers both RabbitMQ-enabled and disabled modes)
         sendWhatsAppForStatus(savedOrder);
 
-        // Push real-time SSE update to the connected user
-        sseNotificationService.sendOrderUpdate(
-                savedOrder.getUser().getId(), savedOrder.getOrderNumber(), savedOrder.getStatus());
+        // Push real-time SSE update to the connected user if user exists
+        if (savedOrder.getUser() != null && savedOrder.getUser().getId() != null) {
+            try {
+                sseNotificationService.sendOrderUpdate(
+                        savedOrder.getUser().getId(), savedOrder.getOrderNumber(), savedOrder.getStatus());
+            } catch (Exception e) {
+                log.warn("SSE notify failed for order {}: {}", savedOrder.getOrderNumber(), e.getMessage());
+            }
+        } else {
+            log.debug("Order {} updated but no user attached; skipping SSE push", savedOrder.getOrderNumber());
+        }
 
         return toOrderResponse(savedOrder, null);
     }
