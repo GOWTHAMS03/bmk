@@ -242,10 +242,14 @@ public class OrderService {
     // ==================== HELPERS ====================
 
     private void validateStatusTransition(OrderStatus current, OrderStatus next) {
+        // Canonical admin flow:
+        // PLACED → CONFIRMED → PREPARING → READY_FOR_PICKUP → OUT_FOR_DELIVERY → DELIVERED
+        // ACCEPTED is kept in the enum for legacy/delivery-partner use but is no longer
+        // required in the main flow — admins go directly CONFIRMED → PREPARING.
         boolean valid = switch (current) {
-            case PLACED -> next == OrderStatus.ACCEPTED || next == OrderStatus.CONFIRMED || next == OrderStatus.CANCELLED;
-            case CONFIRMED -> next == OrderStatus.ACCEPTED || next == OrderStatus.PREPARING || next == OrderStatus.CANCELLED;
-            case ACCEPTED -> next == OrderStatus.PREPARING || next == OrderStatus.CANCELLED;
+            case PLACED    -> next == OrderStatus.CONFIRMED  || next == OrderStatus.CANCELLED;
+            case CONFIRMED -> next == OrderStatus.PREPARING  || next == OrderStatus.CANCELLED;
+            case ACCEPTED  -> next == OrderStatus.PREPARING  || next == OrderStatus.CANCELLED;
             case PREPARING -> next == OrderStatus.READY_FOR_PICKUP || next == OrderStatus.CANCELLED;
             case READY_FOR_PICKUP -> next == OrderStatus.OUT_FOR_DELIVERY || next == OrderStatus.DELIVERED;
             case OUT_FOR_DELIVERY -> next == OrderStatus.DELIVERED;
