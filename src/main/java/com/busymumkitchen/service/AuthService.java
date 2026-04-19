@@ -26,6 +26,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final SmsService smsService;
+    private final EmailOtpService emailOtpService;
     private final KeyValueStore keyValueStore;
 
     @Value("${otp.expiry-seconds}")
@@ -39,6 +40,10 @@ public class AuthService {
 
     @Value("${jwt.access-token-expiry}")
     private long accessTokenExpiry;
+
+    /** OTP delivery method: DEV, EMAIL, or SMS */
+    @Value("${otp.delivery-method:DEV}")
+    private String otpDeliveryMethod;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String OTP_PREFIX = "otp:";
@@ -55,8 +60,8 @@ public class AuthService {
             throw new BadRequestException("Too many OTP requests. Please try again later.");
         }
 
-        // Generate OTP
-        String otp = generateOtp();
+        // Generate OTP (in DEV mode, always use fixed "123456")
+        String otp = "DEV".equalsIgnoreCase(otpDeliveryMethod) ? "123456" : generateOtp();
 
         // Store OTP
         String otpKey = OTP_PREFIX + phoneNumber;
@@ -66,8 +71,42 @@ public class AuthService {
         keyValueStore.increment(attemptsKey);
         keyValueStore.expire(attemptsKey, Duration.ofMinutes(30));
 
-        // Send OTP via SMS (dev fallback: printed to console when aws.sns.enabled=false)
-        smsService.sendOtp(phoneNumber, otp);
+        // Deliver OTP based on configured method
+        switch (otpDeliveryMethod.toUpperCase()) {
+            case "EMAIL" -> {
+                // Email-based OTP (FREE via Gmail SMTP)
+                String email = request.getEmail();
+                if (email == null || email.isBlank()) {
+                    // Try to find email from existing user
+                    User existingUser = userRepository.findByPhoneNumber(phoneNumber).orElse(null);
+                    if (existingUser != null && existingUser.getEmail() != null) {
+                        email = existingUser.getEmail();
+                    }
+                }
+                if (email != null && !email.isBlank()) {
+                    emailOtpService.sendOtpEmail(email, otp);
+                    log.info("OTP sent via EMAIL to user with phone: {}", phoneNumber);
+                } else {
+                    // Fallback: log to console if no email available
+                    log.warn("No email found for {}. OTP: {} (provide email in request or register first)", phoneNumber, otp);
+                }
+            }
+            case "SMS" -> {
+                // SMS-based OTP (Twilio/AWS SNS — paid)
+                smsService.sendOtp(phoneNumber, otp);
+            }
+            default -> {
+                // DEV mode — fixed OTP "123456", printed to console
+                log.warn("\n=====================================================\n" +
+                         "  [DEV MODE] OTP = 123456 (always)                    \n" +
+                         "  Phone  : {}                                         \n" +
+                         "  Method : DEV (free, no SMS/email sent)              \n" +
+                         "  → Set OTP_DELIVERY_METHOD=EMAIL for free email OTP  \n" +
+                         "  → Set OTP_DELIVERY_METHOD=SMS for paid SMS OTP      \n" +
+                         "=====================================================\n",
+                         phoneNumber);
+            }
+        }
     }
 
     @Transactional

@@ -87,6 +87,41 @@ otp:
   expiry-seconds: 300
   length: 6
   max-attempts: 5
+  # OTP delivery method: EMAIL, SMS, or DEV
+  #   EMAIL → sends via Gmail SMTP (free, requires email on user)
+  #   SMS   → sends via Twilio/AWS SNS (paid)
+  #   DEV   → fixed OTP "123456" always works, printed to console (free, for testing)
+  delivery-method: ${OTP_DELIVERY_METHOD:DEV}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Email (Gmail SMTP — FREE OTP delivery)
+#
+# Setup:
+#   1. Go to https://myaccount.google.com/apppasswords
+#   2. Generate an App Password for "Mail"
+#   3. Set env vars:
+#      MAIL_USERNAME=your.email@gmail.com
+#      MAIL_PASSWORD=xxxx xxxx xxxx xxxx  (the 16-char app password)
+# ─────────────────────────────────────────────────────────────────────────────
+spring.mail:
+  host: ${MAIL_HOST:smtp.gmail.com}
+  port: ${MAIL_PORT:587}
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enabled: true
+          required: true
+        connectiontimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
+
+mail:
+  from: ${MAIL_FROM:${MAIL_USERNAME:noreply@busymumkitchen.com}}
+  from-name: ${MAIL_FROM_NAME:BusyMumKitchen}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AWS SNS (SMS delivery)

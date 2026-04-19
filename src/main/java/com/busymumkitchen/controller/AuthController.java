@@ -27,7 +27,7 @@ public class AuthController {
         authService.sendOtp(request);
         return ResponseEntity.ok(ApiResponse.success(
                 "OTP sent successfully",
-                Map.of("otpExpiry", 300)
+                Map.of("otpExpiry", 300, "message", "Check your email/SMS or use 123456 in DEV mode")
         ));
     }
 
