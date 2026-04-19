@@ -70,6 +70,13 @@ spring:
       write-dates-as-timestamps: false
     default-property-inclusion: non_null
 
+  # File upload limits (for Cloudinary image uploads)
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 12MB
+
 # Redis enabled flag (false = in-memory fallback for local dev)
 redis:
   enabled: ${REDIS_ENABLED:false}
@@ -218,5 +225,26 @@ logging:
     com.busymumkitchen: DEBUG
     org.springframework.security: INFO
     org.hibernate.SQL: INFO
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cloudinary — FREE image storage (25 GB, no credit card required)
+#
+# Setup (takes 2 minutes):
+#   1. Create free account at https://cloudinary.com/users/register/free
+#   2. From your dashboard copy CLOUD_NAME, API_KEY, API_SECRET
+#   3. Set environment variables:
+#      CLOUDINARY_CLOUD_NAME=yourcloudname
+#      CLOUDINARY_API_KEY=123456789012345
+#      CLOUDINARY_API_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+#
+# Images will be stored in the "bmk-menu" folder and the public URL
+# (https://res.cloudinary.com/<cloud>/image/upload/...) is saved to the DB.
+# Migrating to AWS S3 later only requires changing this service.
+# ─────────────────────────────────────────────────────────────────────────────
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:demo}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
+  folder: bmk-menu
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
