@@ -242,7 +242,7 @@ logging:
 # Migrating to AWS S3 later only requires changing this service.
 # ─────────────────────────────────────────────────────────────────────────────
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME:demo}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
   api-key: ${CLOUDINARY_API_KEY:}
   api-secret: ${CLOUDINARY_API_SECRET:}
   folder: bmk-menu
