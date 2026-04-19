@@ -28,13 +28,13 @@ public class MenuItemRequest {
     private BigDecimal discountedPrice;
 
     private String imageUrl;
-    private Boolean isVegetarian = false;
-    private Boolean isVegan = false;
-    private Boolean isGlutenFree = false;
-    private Boolean isAvailable = true;
+    private Boolean vegetarian = false;
+    private Boolean vegan = false;
+    private Boolean glutenFree = false;
+    private Boolean available = true;
 
     @Min(value = 1, message = "Preparation time must be at least 1 minute")
-    private Integer preparationTimeMins;
+    private Integer preparationTime;
 
     private Integer calories;
     private Integer sortOrder = 0;
