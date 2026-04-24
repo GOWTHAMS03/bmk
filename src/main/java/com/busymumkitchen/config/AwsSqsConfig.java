@@ -24,7 +24,7 @@ public class AwsSqsConfig {
     @Bean
     @ConditionalOnProperty(name = "aws.sqs.enabled", havingValue = "true", matchIfMissing = false)
     public SqsClient sqsClient() {
-        SqsClient.Builder builder = SqsClient.builder().region(Region.of(region));
+        var builder = SqsClient.builder().region(Region.of(region));
 
         if (accessKey != null && !accessKey.isBlank() && secretKey != null && !secretKey.isBlank()) {
             AwsBasicCredentials creds = AwsBasicCredentials.create(accessKey, secretKey);
