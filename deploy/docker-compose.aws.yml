@@ -1,0 +1,138 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BusyMumKitchen – Production Docker Compose (AWS EC2)
+#
+# Architecture:
+#   PostgreSQL  → AWS RDS  (managed, NOT in this compose)
+#   MongoDB     → MongoDB Atlas  (managed, NOT in this compose)
+#   Redis       → Docker on EC2 (cache, not persistent-critical)
+#   RabbitMQ    → Docker on EC2
+#   App         → Docker on EC2 (image pulled from ECR)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: bmk_redis
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+    networks:
+      - bmk_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── RabbitMQ ────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    container_name: bmk_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+    networks:
+      - bmk_network
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Spring Boot Backend ─────────────────────────────────────────────────────
+  backend:
+    image: ${ECR_IMAGE}   # e.g. 123456789.dkr.ecr.ap-south-1.amazonaws.com/bmk-backend:latest
+    container_name: bmk_backend
+    restart: unless-stopped
+    environment:
+      # ── Database (AWS RDS) ──────────────────────────────────────────────────
+      DB_HOST: ${DB_HOST}
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      # ── MongoDB Atlas ───────────────────────────────────────────────────────
+      MONGODB_URI: ${MONGODB_URI}
+
+      # ── Redis ───────────────────────────────────────────────────────────────
+      REDIS_ENABLED: "true"
+      CACHE_TYPE: redis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ""
+
+      # ── RabbitMQ ────────────────────────────────────────────────────────────
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+
+      # ── JWT ─────────────────────────────────────────────────────────────────
+      JWT_SECRET: ${JWT_SECRET}
+
+      # ── AWS ─────────────────────────────────────────────────────────────────
+      AWS_REGION: ${AWS_REGION}
+      AWS_SNS_ENABLED: ${AWS_SNS_ENABLED:-false}
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_SNS_SENDER_ID: ${AWS_SNS_SENDER_ID:-BMKITCHN}
+
+      # ── OTP ─────────────────────────────────────────────────────────────────
+      OTP_DELIVERY_METHOD: ${OTP_DELIVERY_METHOD:-SMS}
+
+      # ── Email (Gmail SMTP) ───────────────────────────────────────────────────
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+
+      # ── Stripe ──────────────────────────────────────────────────────────────
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+
+      # ── JVM tuning ──────────────────────────────────────────────────────────
+      JAVA_OPTS: "-XX:+UseG1GC -XX:MaxRAMPercentage=75.0"
+      SERVER_PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bmk_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/v1/actuator/health | grep -q UP || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  rabbitmq_data:
+
+networks:
+  bmk_network:
+    driver: bridge

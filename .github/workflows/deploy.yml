@@ -1,0 +1,51 @@
+name: CI: Build, Push, Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_ecr_repo_name: backend-app
+      TF_VAR_ecs_cluster_name: backend-cluster
+      TF_VAR_service_name: backend-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        working-directory: backend/infra
+        run: terraform init
+
+      - name: Terraform Apply (create infra)
+        working-directory: backend/infra
+        run: terraform apply -auto-approve
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push Docker image to ECR
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.TF_VAR_ecr_repo_name }}:latest
+
+      - name: Force new ECS deployment
+        run: |
+          aws ecs update-service --cluster ${{ env.TF_VAR_ecs_cluster_name }} --service ${{ env.TF_VAR_service_name }} --force-new-deployment --region ${{ secrets.AWS_REGION }}
