@@ -116,6 +116,12 @@
             <artifactId>sns</artifactId>
             <version>${aws.sdk.version}</version>
         </dependency>
+        <!-- AWS SQS -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sqs</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
 
         <!-- OpenAPI / Swagger -->
         <dependency>
@@ -150,11 +156,12 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <!-- Cloudinary (free image hosting) -->
+        <!-- Image hosting: switched from Cloudinary to AWS S3 -->
+        <!-- AWS S3 for image uploads -->
         <dependency>
-            <groupId>com.cloudinary</groupId>
-            <artifactId>cloudinary-http44</artifactId>
-            <version>1.38.0</version>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws.sdk.version}</version>
         </dependency>
 
         <!-- Test -->

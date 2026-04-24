@@ -4,6 +4,10 @@ import com.busymumkitchen.model.Order;
 import com.busymumkitchen.model.enums.OrderStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -15,6 +19,7 @@ import java.util.Map;
 public class OrderEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
+        private final SqsClient sqsClient;
     private final boolean enabled;
 
     @Value("${rabbitmq.exchange}")
@@ -32,12 +37,28 @@ public class OrderEventPublisher {
     @Value("${rabbitmq.routing-keys.analytics}")
     private String analyticsKey;
 
-    public OrderEventPublisher(
-            @Autowired(required = false) RabbitTemplate rabbitTemplate,
-            @Value("${rabbitmq.enabled:false}") boolean enabled) {
-        this.rabbitTemplate = rabbitTemplate;
-        this.enabled = enabled;
-    }
+        @Value("${SQS_ORDER_CREATED_URL:}")
+        private String sqsOrderCreatedUrl;
+
+        @Value("${SQS_ORDER_UPDATED_URL:}")
+        private String sqsOrderUpdatedUrl;
+
+        @Value("${SQS_NOTIFICATION_URL:}")
+        private String sqsNotificationUrl;
+
+        @Value("${SQS_ANALYTICS_URL:}")
+        private String sqsAnalyticsUrl;
+
+        private final ObjectMapper objectMapper = new ObjectMapper();
+
+        public OrderEventPublisher(
+                        @Autowired(required = false) RabbitTemplate rabbitTemplate,
+                        @Autowired(required = false) SqsClient sqsClient,
+                        @Value("${rabbitmq.enabled:false}") boolean enabled) {
+                this.rabbitTemplate = rabbitTemplate;
+                this.sqsClient = sqsClient;
+                this.enabled = enabled;
+        }
 
     public void publishOrderCreated(Order order) {
                 String userId = null;
@@ -56,27 +77,20 @@ public class OrderEventPublisher {
                 if (enabled && rabbitTemplate != null) {
                         rabbitTemplate.convertAndSend(exchange, orderCreatedKey, event);
                         log.info("Published ORDER_CREATED event for order: {}", order.getOrderNumber());
-
-                        // Also send notification event
-                        java.util.Map<String, Object> notif = new java.util.HashMap<>();
-                        notif.put("type", "ORDER_CREATED");
-                        notif.put("orderId", order.getId().toString());
-                        notif.put("orderNumber", order.getOrderNumber());
-                        if (userId != null) notif.put("userId", userId);
-                        rabbitTemplate.convertAndSend(exchange, notificationKey, notif);
-
-                        // Analytics event
-                        java.util.Map<String, Object> analytics = new java.util.HashMap<>();
-                        analytics.put("eventType", "ORDER_PLACED");
-                        if (userId != null) analytics.put("userId", userId);
-                        java.util.Map<String, Object> data = new java.util.HashMap<>();
-                        data.put("orderId", order.getId().toString());
-                        data.put("amount", order.getFinalAmount() != null ? order.getFinalAmount().toString() : "0");
-                        data.put("itemCount", order.getItems() != null ? order.getItems().size() : 0);
-                        analytics.put("data", data);
-                        rabbitTemplate.convertAndSend(exchange, analyticsKey, analytics);
+                } else if (sqsClient != null && sqsOrderCreatedUrl != null && !sqsOrderCreatedUrl.isEmpty()) {
+                        try {
+                            String body = objectMapper.writeValueAsString(event);
+                            SendMessageRequest req = SendMessageRequest.builder()
+                                    .queueUrl(sqsOrderCreatedUrl)
+                                    .messageBody(body)
+                                    .build();
+                            sqsClient.sendMessage(req);
+                            log.info("Published ORDER_CREATED event to SQS for order: {}", order.getOrderNumber());
+                        } catch (JsonProcessingException e) {
+                            log.error("Failed to serialize ORDER_CREATED event", e);
+                        }
                 } else {
-                        log.info("[DEV MODE] ORDER_CREATED event (RabbitMQ disabled): order={}, user={}, amount={}",
+                        log.info("[DEV MODE] ORDER_CREATED event (messaging disabled): order={}, user={}, amount={}",
                                         order.getOrderNumber(), userId, order.getFinalAmount());
                 }
     }
@@ -99,17 +113,20 @@ public class OrderEventPublisher {
                         rabbitTemplate.convertAndSend(exchange, orderUpdatedKey, event);
                         log.info("Published ORDER_UPDATED event for order: {} ({} -> {})",
                                         order.getOrderNumber(), previousStatus, order.getStatus());
-
-                        // Send notification
-                        java.util.Map<String, Object> notif = new java.util.HashMap<>();
-                        notif.put("type", "ORDER_STATUS_CHANGED");
-                        notif.put("orderId", order.getId().toString());
-                        notif.put("orderNumber", order.getOrderNumber());
-                        if (userId != null) notif.put("userId", userId);
-                        notif.put("newStatus", order.getStatus() != null ? order.getStatus().name() : null);
-                        rabbitTemplate.convertAndSend(exchange, notificationKey, notif);
+                } else if (sqsClient != null && sqsOrderUpdatedUrl != null && !sqsOrderUpdatedUrl.isEmpty()) {
+                        try {
+                            String body = objectMapper.writeValueAsString(event);
+                            SendMessageRequest req = SendMessageRequest.builder()
+                                    .queueUrl(sqsOrderUpdatedUrl)
+                                    .messageBody(body)
+                                    .build();
+                            sqsClient.sendMessage(req);
+                            log.info("Published ORDER_UPDATED event to SQS for order: {}", order.getOrderNumber());
+                        } catch (JsonProcessingException e) {
+                            log.error("Failed to serialize ORDER_UPDATED event", e);
+                        }
                 } else {
-                        log.info("[DEV MODE] ORDER_UPDATED event (RabbitMQ disabled): order={}, {} -> {}",
+                        log.info("[DEV MODE] ORDER_UPDATED event (messaging disabled): order={}, {} -> {}",
                                         order.getOrderNumber(), previousStatus, order.getStatus());
                 }
         }

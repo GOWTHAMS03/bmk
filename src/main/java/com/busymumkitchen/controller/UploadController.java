@@ -21,8 +21,8 @@ public class UploadController {
     /**
      * POST /api/v1/upload/image
      *
-     * Upload an image to Cloudinary (free bucket).
-     * Returns: { "success": true, "data": { "url": "https://res.cloudinary.com/..." } }
+    * Upload an image to S3 bucket.
+    * Returns: { "success": true, "data": { "url": "https://<bucket>.s3.<region>.amazonaws.com/..." } }
      *
      * Requires ADMIN or KITCHEN_STAFF role.
      * Max size: 5 MB. Allowed types: JPEG, PNG, WebP, GIF.
