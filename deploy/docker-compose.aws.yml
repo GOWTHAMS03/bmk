@@ -37,8 +37,8 @@ services:
     image: rabbitmq:3.13-alpine
     container_name: bmk_rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     restart: unless-stopped
@@ -63,10 +63,11 @@ services:
     environment:
       # ── Database (AWS RDS) ──────────────────────────────────────────────────
       DB_HOST: ${DB_HOST}
-      DB_PORT: "5432"
+      DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_SSL_MODE: ${DB_SSL_MODE:-require}
 
       # ── MongoDB Atlas ───────────────────────────────────────────────────────
       MONGODB_URI: ${MONGODB_URI}

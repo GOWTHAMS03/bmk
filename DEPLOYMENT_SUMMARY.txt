@@ -1,0 +1,89 @@
+﻿
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘                    DEPLOYMENT SUMMARY - SAVE THIS INFO                 â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+âœ… INFRASTRUCTURE CREATED/CONFIGURED:
+
+  ðŸ”Œ RDS PostgreSQL Database:
+     Instance ID:  bmk-postgres
+     Endpoint:     bmk-postgres.c9wmwqym0log.ap-south-1.rds.amazonaws.com:5432
+      Database:     busymumkitchen
+      Username:     bmk_user
+      Password:      [SAVE THIS!]
+
+   [EC2 INSTANCE]
+      Instance ID:  i-005c27dec4993f272
+      IP Address:   13.233.178.203
+      Instance Type: t3.micro
+      Key Pair:     bmk-key
+      SSH Key File: D:\admin-flutter\busymumkitchen\backend\bmk-key.pem
+
+   [SECURITY GROUPS]
+      EC2 SG:      sg-0a4d3b1b0e46b491a
+      RDS SG:      sg-0a41e52bdb09cf8d8
+
+   [ECR REPOSITORY]
+      URI:         776805327963.dkr.ecr.ap-south-1.amazonaws.com/bmk-backend
+      Region:      ap-south-1
+      AWS Account: 776805327963
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+[NEXT STEPS]
+
+   1. Update .env.aws with your secrets:
+      - Stripe keys (if using Stripe)
+      - AWS SNS credentials (if using SMS OTP)
+      - JWT secret (already generated)
+
+   2. Build and push Docker image to ECR:
+
+      $token = aws ecr get-login-password --region ap-south-1
+      $token | docker login --username AWS --password-stdin 776805327963.dkr.ecr.ap-south-1.amazonaws.com
+
+      .\build-docker.ps1 -Push
+
+   3. SSH into EC2 and initialize:
+
+      ssh -i "D:\admin-flutter\busymumkitchen\backend\bmk-key.pem" ubuntu@13.233.178.203
+
+      Once connected:
+      mkdir -p /opt/bmk/deploy
+      cd /opt/bmk/deploy
+
+   4. Copy docker-compose and .env files to EC2:
+
+      scp -i "D:\admin-flutter\busymumkitchen\backend\bmk-key.pem" docker-compose.yml ubuntu@13.233.178.203:/opt/bmk/deploy/
+      scp -i "D:\admin-flutter\busymumkitchen\backend\bmk-key.pem" .env.aws ubuntu@13.233.178.203:/opt/bmk/deploy/.env
+      chmod 600 /opt/bmk/deploy/.env
+
+   5. Start the application on EC2:
+
+      docker-compose up -d
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+[SECURITY REMINDERS]
+
+   â€¢ Store DB password and key file safely
+   â€¢ Restrict SSH access to your IP in production
+   â€¢ Use strong JWT and Stripe secrets
+   â€¢ Regularly backup RDS database
+   â€¢ Monitor EC2 CloudWatch logs
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+[HEALTH CHECK]
+
+   â€¢ App:      http://13.233.178.203:8080/api/v1/actuator/health
+   â€¢ Docs:     http://13.233.178.203:8080/swagger-ui.html
+   â€¢ RabbitMQ: http:// (guest/guest)
+
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+[CONFIGURATION FILES SAVED]
+   - .env.aws (environment variables)
+   - bmk-key-fixed.pem (SSH private key)
+
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
